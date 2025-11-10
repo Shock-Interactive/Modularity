@@ -18,6 +18,6 @@ GLFWwindow* Window::makeWindow() {
     }
 
     glfwMakeContextCurrent(window);
-
+    
     return window;
 }

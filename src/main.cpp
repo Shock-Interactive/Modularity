@@ -8,6 +8,7 @@ int main()
 
     if (!editorWindow) return -1;
     
+    // Main loop
     while (!glfwWindowShouldClose(editorWindow)) {
         glfwSwapBuffers(editorWindow);
         glfwPollEvents();
