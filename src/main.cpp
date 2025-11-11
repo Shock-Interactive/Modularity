@@ -1,5 +1,11 @@
 #include <iostream>
-#include "Headers/Window/Window.h"
+#include "../include/Window/Window.h"
+
+float vertices[] = {
+    -0.5f, -0.5f, 0.0f,
+     0.5f, -0.5f, 0.0f,
+     0.0f,  0.5f, 0.0f
+};  
 
 int main()
 {
