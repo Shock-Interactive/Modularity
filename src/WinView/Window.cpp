@@ -1,4 +1,4 @@
-#include "../Headers/Window/Window.h"
+#include "../../include/Window/Window.h"
 
 GLFWwindow* Window::makeWindow() {
 #if defined(__linux__)
@@ -18,6 +18,15 @@ GLFWwindow* Window::makeWindow() {
     }
 
     glfwMakeContextCurrent(window);
+<<<<<<< HEAD
     
+=======
+
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        std::cerr << "Failed to initialize GLAD\n";
+        return nullptr;
+    }
+
+>>>>>>> 1ec3aa52144b306094f1119dfd3899de9664f7b8
     return window;
 }

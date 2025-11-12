@@ -2,5 +2,9 @@
     "files.associations": {
         "iostream": "cpp"
     },
+<<<<<<< HEAD
     "makefile.configureOnOpen": true
+=======
+    "cmake.sourceDirectory": "/home/thesona/Modularity/modularitylauncher"
+>>>>>>> 1ec3aa52144b306094f1119dfd3899de9664f7b8
 }
