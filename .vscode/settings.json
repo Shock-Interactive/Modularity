@@ -1,6 +1,7 @@
 {
     "files.associations": {
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "sstream": "cpp"
     },
     "cmake.sourceDirectory": "/home/thesona/Modularity/modularitylauncher"
 }
