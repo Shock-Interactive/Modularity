@@ -1,0 +1,76 @@
+name: Build C++ Project with Fedora Container and Create Release
+
+on:
+  push:
+    branches:
+      - main  # Trigger on push to the main branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # GitHub-hosted Ubuntu runner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker
+        run: |
+          sudo apt-get update
+          sudo apt-get install docker.io  # Install Docker if it's not available
+
+      - name: Build project in Fedora container
+        run: |
+          # Pull the Fedora image from Docker Hub
+          docker pull fedora:latest
+
+          # Run the Fedora container and install dependencies
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace fedora:latest bash -c "
+            # Update the package list and install necessary dependencies
+            dnf update -y && \
+            dnf install -y \
+              cmake \
+              gcc \
+              g++ \
+              glfw-devel \
+              make \
+              git && \
+            
+            # Run the build script (adjust if you have specific build steps)
+            mkdir -p build
+            cd build
+            cmake .. && \
+            make
+          "
+
+      - name: Create GitHub Release and Upload Executable
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # This token is automatically available for authenticated actions
+        run: |
+          # Set the release version (adjust this as per your versioning strategy)
+          VERSION=$(git describe --tags --abbrev=0)
+
+          # Create a new release
+          RELEASE_RESPONSE=$(curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/releases \
+            -d '{
+              "tag_name": "v'$VERSION'",
+              "target_commitish": "main",
+              "name": "Release v'$VERSION'",
+              "body": "Automated release of the C++ project.",
+              "draft": false,
+              "prerelease": false
+            }')
+
+          # Extract the upload URL from the release response
+          UPLOAD_URL=$(echo $RELEASE_RESPONSE | jq -r .upload_url | sed -e "s/{?name,label}//")
+
+          # Upload the executable file
+          curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @./build/main \
+            "$UPLOAD_URL?name=main-linux-x86_64"
+
+          echo "Release v$VERSION created and 'main' executable uploaded."
