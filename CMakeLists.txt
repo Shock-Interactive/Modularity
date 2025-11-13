@@ -22,6 +22,30 @@ target_include_directories(glad PUBLIC src/ThirdParty/glad)
 add_library(glm INTERFACE)
 target_include_directories(glm INTERFACE src/ThirdParty/glm)
 
+# ===== IMGUI =====
+set(IMGUI_DIR ${PROJECT_SOURCE_DIR}/src/ThirdParty/imgui)
+
+set(IMGUI_SOURCES
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    # ---- back-ends -------------------------------------------------
+    ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+)
+
+add_library(imgui STATIC ${IMGUI_SOURCES})
+
+target_include_directories(imgui
+    PUBLIC
+        ${IMGUI_DIR}
+        ${IMGUI_DIR}/backends
+)
+
+target_link_libraries(imgui PRIVATE glfw)
+
 # ===== Collect all source files =====
 file(GLOB_RECURSE PROJECT_SOURCES
     src/*.cpp
@@ -37,7 +61,7 @@ list(FILTER PROJECT_SOURCES EXCLUDE REGEX "src/main\\.cpp")
 # ===== Core library =====
 add_library(core ${PROJECT_SOURCES})
 target_include_directories(core PUBLIC include)
-target_link_libraries(core PRIVATE glad glm)
+target_link_libraries(core PRIVATE glad glm imgui)
 
 # ===== GLFW setup =====
 if(WIN32)
@@ -45,14 +69,15 @@ if(WIN32)
     set(PLATFORM_LIBS glfw3 opengl32 gdi32)
 else()
     find_package(PkgConfig REQUIRED)
+    find_package(X11 REQUIRED)
     pkg_check_modules(GLFW REQUIRED glfw3)
-    set(PLATFORM_LIBS ${GLFW_LIBRARIES} GL dl pthread)
+    set(PLATFORM_LIBS ${GLFW_LIBRARIES} ${X11_LIBRARIES} GL dl pthread)
     include_directories(${GLFW_INCLUDE_DIRS})
 endif()
 
 # ===== Main executable =====
 add_executable(main src/main.cpp)
-target_link_libraries(main PRIVATE core glad glm ${PLATFORM_LIBS})
+target_link_libraries(main PRIVATE core glad glm imgui ${PLATFORM_LIBS})
 
 # ===== Optional: run target =====
 add_custom_target(run
