@@ -48,7 +48,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # This token is automatically available for authenticated actions
         run: |
           # Set the release version (adjust this as per your versioning strategy)
-          VERSION=$(git describe --tags --abbrev=0)
+          VERSION=$(git describe --tags --abbrev=0 || echo "v1.0.0")
 
           # Create a new release
           RELEASE_RESPONSE=$(curl -X POST \
