@@ -3,5 +3,6 @@
         "iostream": "cpp",
         "sstream": "cpp"
     },
-    "cmake.sourceDirectory": "/home/thesona/Modularity/modularitylauncher"
+    "cmake.sourceDirectory": "/home/theonesonakrie/Modularity",
+    "C_Cpp.errorSquiggles": "disabled"
 }

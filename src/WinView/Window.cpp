@@ -1,6 +1,7 @@
 #include "../../include/Window/Window.h"
 
 GLFWwindow* Window::makeWindow() {
+#
 #if defined(__linux__)
     setenv("XDG_SESSION_TYPE", "x11", 1);
 #endif
