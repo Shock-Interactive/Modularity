@@ -7,13 +7,13 @@ if [ -d "build" ]; then
     cd build
     cmake ..
     cmake --build . -- -j$(nproc)
-    cp -r ../Shaders .
+    cp -r ../Resources .
     echo "Build Done!"
 else
     mkdir build
     cd build
     cmake ..
     cmake --build . -- -j$(nproc)
-    cp -r ../Shaders .
+    cp -r ../Resources .
     echo "Build Done!"
 fi
