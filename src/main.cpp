@@ -34,7 +34,7 @@ int main()
     style.ScaleAllSizes(main_scale);
     style.FontScaleDpi = main_scale;
     ImGui_ImplGlfw_InitForOpenGL(editorWindow, true);
-    ImGui_ImplOpenGL3_Init("#version 150");
+    ImGui_ImplOpenGL3_Init("#version 330");
 
 
     unsigned int VBO, VAO;
