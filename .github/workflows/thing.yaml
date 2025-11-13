@@ -16,6 +16,7 @@ jobs:
       - name: Set up Docker
         run: |
           sudo apt-get update
+          sudo apt-get remove -y containerd containerd.io
           sudo apt-get install docker.io  # Install Docker if it's not available
 
       - name: Build project in Fedora container
