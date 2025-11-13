@@ -32,10 +32,15 @@ GLFWwindow* Window::makeWindow() {
     }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> 1ec3aa52144b306094f1119dfd3899de9664f7b8
 =======
     std::cout << "OpenGL: " << glGetString(GL_VERSION) << "\n";
 
 >>>>>>> 834c6b5c445f3c715524cf257564f06da5555aa6
+=======
+    std::cout << "OpenGL: " << glGetString(GL_VERSION) << "\n";
+
+>>>>>>> 834c6b5 (finally eh?)
     return window;
 }

@@ -146,6 +146,40 @@ int main()
         std::cerr << "FBO not complete!\n";
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+<<<<<<< HEAD
+=======
+    glfwSetWindowSizeCallback(editorWindow, window_size_callback);
+    glfwSetCursorPosCallback(editorWindow, mouse_callback);
+
+    glEnable(GL_DEPTH_TEST);
+
+    Shader shader("Resources/Shaders/vert.glsl", "Resources/Shaders/frag.glsl");
+    if (shader.ID == 0) { std::cerr << "Shader failed!\n"; return -1; }
+
+    Texture texture("Resources/Textures/container.jpg");
+    Texture texture1("Resources/Textures/awesomeface.png");
+
+    unsigned int framebuffer, viewportTexture, rbo;
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+    glGenTextures(1, &viewportTexture);
+    glBindTexture(GL_TEXTURE_2D, viewportTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, vpWidth, vpHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, viewportTexture, 0);
+
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, vpWidth, vpHeight);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cerr << "FBO not complete!\n";
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+>>>>>>> 834c6b5 (finally eh?)
     float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor());
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -160,7 +194,10 @@ int main()
     if (!ImGui_ImplOpenGL3_Init("#version 330")) {
         std::cerr << "ImGui OpenGL3 failed!\n";
         return -1;
+<<<<<<< HEAD
 >>>>>>> 834c6b5c445f3c715524cf257564f06da5555aa6
+=======
+>>>>>>> 834c6b5 (finally eh?)
     }
 
     unsigned int VBO, VAO;
