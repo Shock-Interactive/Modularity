@@ -1,14 +1,18 @@
 #include "../../include/Window/Window.h"
 
 GLFWwindow* Window::makeWindow() {
-#if defined(__linux__)
-    setenv("XDG_SESSION_TYPE", "x11", 1);
-#endif
+    #if defined(__linux__)
+        setenv("XDG_SESSION_TYPE", "x11", 1);
+    #endif
 
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW\n";
         return nullptr;
     }
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     GLFWwindow* window = glfwCreateWindow(800, 600, "Modularity", nullptr, nullptr);
     if (!window) {
@@ -27,6 +31,11 @@ GLFWwindow* Window::makeWindow() {
         return nullptr;
     }
 
+<<<<<<< HEAD
 >>>>>>> 1ec3aa52144b306094f1119dfd3899de9664f7b8
+=======
+    std::cout << "OpenGL: " << glGetString(GL_VERSION) << "\n";
+
+>>>>>>> 834c6b5c445f3c715524cf257564f06da5555aa6
     return window;
 }
