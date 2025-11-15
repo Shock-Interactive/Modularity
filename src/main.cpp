@@ -486,10 +486,10 @@ public:
             }
             ImGui::End();
 
-            // Placeholder UI
-            ImGui::Begin("Bank Account");
-            ImGui::Text("Balance: $0.00 (broke as fuck)");
-            ImGui::End();
+            // Placeholder UI stuff
+            //ImGui::Begin("Bank Account");
+            //ImGui::Text("Balance: $0.00 (broke as fuck)");
+            //ImGui::End();
 
             // Render scene to FBO now that size is known
             glm::mat4 model = glm::rotate(glm::mat4(1.0f), currentFrame * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
