@@ -1,6 +1,6 @@
 #include <iostream>
-#include <algorithm>  // For std::min
-#include <stdexcept>  // For std::runtime_error
+#include <algorithm>
+#include <stdexcept>
 #include <glad/glad.h>
 #include "ThirdParty/imgui/imgui.h"
 #include "ThirdParty/imgui/backends/imgui_impl_glfw.h"
@@ -8,59 +8,59 @@
 #include "../include/Window/Window.h"
 #include "../include/Shaders/Shader.h"
 #include "../include/Textures/Texture.h"
+#include "../include/Skybox/Skybox.h"
 #include "ThirdParty/glm/gtc/matrix_transform.hpp"
 #include "ThirdParty/glm/gtc/type_ptr.hpp"
 
-// Constants for better maintainability
 constexpr float SENSITIVITY = 0.1f;
 constexpr float CAMERA_SPEED = 2.5f;
 constexpr float FOV = 45.0f;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 100.0f;
 
-// Hardcoded cube vertices (for now; later load from file)
+// Hardcoded cube vertices for now; we should probably load from file sometime later lol.
 float vertices[] = {
-    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
-    0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
-    0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-    0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-    -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+     0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
 
-    -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
-    0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
-    0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
-    0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
-    -0.5f, 0.5f, 0.5f, 0.0f, 1.0f,
-    -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
 
-    -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-    -0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-    -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
-    -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
 
-    0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-    0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-    0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-    0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-    0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
-    0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
 
-    0.5f, -0.5f, -0.5f, 1.0f, 1.0f,
-    0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
-    0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-    0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-    0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-    0.5f, -0.5f, -0.5f, 1.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
 
-    -0.5f, -0.5f, 0.5f, 0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
-    0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
-    0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
-    0.5f, -0.5f, 0.5f, 1.0f, 1.0f,
-    -0.5f, -0.5f, 0.5f, 0.0f, 1.0f
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
 };
 
 // Simple Mesh class for modularity (encapsulates VAO/VBO)
@@ -80,7 +80,8 @@ public:
         // Position attribute
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(0);
-        // Texture coord attribute
+
+        // TexCoord attribute
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
         glEnableVertexAttribArray(1);
 
@@ -106,6 +107,7 @@ public:
     glm::vec3 position = glm::vec3(0.0f, 0.0f, 3.0f);
     glm::vec3 front = glm::vec3(0.0f, 0.0f, -1.0f);
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+    glm::vec3 velocity = glm::vec3(0.0f);
     float yaw = -90.0f;
     float pitch = 0.0f;
     float speed = CAMERA_SPEED;
@@ -138,15 +140,56 @@ public:
     }
 
     void processKeyboard(float deltaTime, GLFWwindow* window) {
-        float velocity = speed * deltaTime;
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            position += velocity * front;
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            position -= velocity * front;
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            position -= glm::normalize(glm::cross(front, up)) * velocity;
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            position += glm::normalize(glm::cross(front, up)) * velocity;
+        // Tunable constants (or move to class scope).
+        const float CAMERA_SPEED = 5.0f;
+        const float SPRINT_SPEED = 10.0f;
+        const float ACCELERATION = 15.0f;
+
+        // Update speed based on shift (sprint overrides base speed).
+        float currentSpeed = CAMERA_SPEED;
+        if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+            currentSpeed = SPRINT_SPEED;
+        }
+
+        glm::vec3 desiredDir(0.0f);
+        bool isMoving = false;
+
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+            desiredDir += front;
+            isMoving = true;
+        }
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+            desiredDir -= front;
+            isMoving = true;
+        }
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+            desiredDir -= glm::normalize(glm::cross(front, up));
+            isMoving = true;
+        }
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+            desiredDir += glm::normalize(glm::cross(front, up));
+            isMoving = true;
+        }
+        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
+            desiredDir -= up;
+            isMoving = true;
+        }
+        if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
+            desiredDir += up;
+            isMoving = true;
+        }
+
+        // Set target velocity (zero if no keys pressed).
+        glm::vec3 targetVelocity(0.0f);
+        if (isMoving) {
+            desiredDir = glm::normalize(desiredDir);
+            targetVelocity = desiredDir * currentSpeed;
+        }
+
+        float smoothFactor = 1.0f - std::exp(-ACCELERATION * deltaTime);
+        velocity = glm::mix(velocity, targetVelocity, smoothFactor);
+
+        position += velocity * deltaTime;
     }
 
     glm::mat4 getViewMatrix() const {
@@ -163,6 +206,7 @@ private:
     Texture* texture1 = nullptr;
     Texture* texture2 = nullptr;
     Mesh* cube = nullptr;
+    Skybox* skybox = nullptr;
 
 public:
     Renderer() = default;
@@ -171,6 +215,7 @@ public:
         delete texture1;
         delete texture2;
         delete cube;
+        delete skybox;
         if (framebuffer) glDeleteFramebuffers(1, &framebuffer);
         if (viewportTexture) glDeleteTextures(1, &viewportTexture);
         if (rbo) glDeleteRenderbuffers(1, &rbo);
@@ -188,6 +233,8 @@ public:
         texture1 = new Texture("Resources/Textures/container.jpg");
         texture2 = new Texture("Resources/Textures/awesomeface.png");
         cube = new Mesh(vertices, sizeof(vertices));
+
+        skybox = new Skybox();
 
         setupFBO();
         glEnable(GL_DEPTH_TEST);
@@ -217,6 +264,8 @@ public:
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        skybox->draw(glm::value_ptr(view), glm::value_ptr(proj));
+
         shader->use();
         shader->setMat4("view", view);
         shader->setMat4("projection", proj);
@@ -225,6 +274,8 @@ public:
         shader->setInt("texture1", 0);
         shader->setInt("texture2", 1);
     }
+
+    Skybox* getSkybox() { return skybox; }
 
     void renderCube(const glm::mat4& model) {
         shader->setMat4("model", model);
@@ -261,7 +312,6 @@ private:
     }
 };
 
-// ViewportController class (centralizes focus and ESC input)
 class ViewportController {
 private:
     bool escPressed = false;
@@ -303,15 +353,11 @@ public:
     }
 };
 
-// Forward declaration for window size callback
 class Engine;
-
-// Window size callback (resizes main display viewport)
 void window_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-// Engine class (orchestrates everything - main refactor)
 class Engine {
 private:
     Window window;
@@ -422,6 +468,22 @@ public:
                 camera.firstMouse = true;
             }
 
+            ImGui::End();
+
+            // Inspector window for skybox time of day control
+            ImGui::Begin("Inspector");
+            if (renderer.getSkybox()) {
+                float timeOfDay = renderer.getSkybox()->getTimeOfDay();
+                ImGui::Text("Skybox Controls");
+                ImGui::Separator();
+                ImGui::SliderFloat("Time of Day", &timeOfDay, 0.0f, 1.0f, "%.2f");
+                ImGui::Text("0.0 = Night");
+                ImGui::Text("0.25 = Sunrise");
+                ImGui::Text("0.5 = Day");
+                ImGui::Text("0.75 = Sunset");
+                ImGui::Text("1.0 = Midnight");
+                renderer.getSkybox()->setTimeOfDay(timeOfDay);
+            }
             ImGui::End();
 
             // Placeholder UI
