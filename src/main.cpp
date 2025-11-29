@@ -686,7 +686,7 @@ public:
     }
 
     void saveProjectFile() const {
-        std::ofstream file(projectPath / "project.engine");
+        std::ofstream file(projectPath / "project.modu");
         file << "name=" << name << "\n";
         file << "lastScene=" << currentSceneName << "\n";
         file.close();
@@ -725,16 +725,16 @@ public:
         #ifdef _WIN32
         const char* appdata = std::getenv("APPDATA");
         if (appdata) {
-            appDataPath = fs::path(appdata) / "GameEngine";
+            appDataPath = fs::path(appdata) / ".modularity";
         } else {
             appDataPath = fs::current_path() / "AppData";
         }
         #else
         const char* home = std::getenv("HOME");
         if (home) {
-            appDataPath = fs::path(home) / ".gameengine";
+            appDataPath = fs::path(home) / ".modularity";
         } else {
-            appDataPath = fs::current_path() / ".gameengine";
+            appDataPath = fs::current_path() / ".modularity";
         }
         #endif
 
@@ -810,7 +810,7 @@ public:
     bool loadProject(const std::string& projectPath) {
         fs::path path(projectPath);
         if (fs::is_directory(path)) {
-            path = path / "project.engine";
+            path = path / "project.modu";
         }
 
         if (!fs::exists(path)) {
@@ -1466,7 +1466,7 @@ private:
         if (ImGui::Begin("Open Project", &projectManager.showOpenProjectDialog,
                         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDocking)) {
 
-            ImGui::Text("Project File Path (.engine):");
+            ImGui::Text("Project File Path (.modu):");
             ImGui::SetNextItemWidth(-70);
             ImGui::InputText("##OpenPath", projectManager.openProjectPath,
                            sizeof(projectManager.openProjectPath));
@@ -1474,7 +1474,7 @@ private:
             if (ImGui::Button("Browse")) {
             }
 
-            ImGui::TextDisabled("Select a project.engine file");
+            ImGui::TextDisabled("Select a project.modu file");
 
             if (!projectManager.errorMessage.empty()) {
                 ImGui::Spacing();
@@ -1525,7 +1525,7 @@ private:
         if (newProject.create()) {
             projectManager.currentProject = newProject;
             projectManager.addToRecentProjects(name,
-                                              (newProject.projectPath / "project.engine").string());
+                                              (newProject.projectPath / "project.modu").string());
 
             if (!initRenderer()) {
                 logToConsole("Error: Failed to initialize renderer!");
