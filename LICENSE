@@ -1,0 +1,29 @@
+Copyright (c) 2025 Shock Interactive LLC
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this engine and associated documentation files (the "Engine"), to use, copy,
+modify, merge, publish, distribute, sublicense, and/or sell copies of software
+that *uses* the Engine (for example, a game or application) under the following conditions:
+
+1. Use in Commercial Games:
+   - You may use the Engine to develop commercial or closed-source games.
+   - You may not sell or distribute the Engine itself or any substantial part of it as a standalone product.
+
+2. Modifications to the Engine:
+   - Any modifications to the Engine’s source code must be released under this same license.
+   - Modifications must include a notice describing the changes made.
+
+3. Distribution:
+   - You may distribute games or software that uses the Engine under any terms you choose.
+   - Distribution of the Engine or derivative Engine code must remain open source under this license.
+
+4. Disclaimer:
+   - The Engine is provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and noninfringement.
+   - In no event shall the authors or copyright holders be liable for any claim, damages, or other liability arising from the use of the Engine.
+
+5. Attribution:
+   - You must include a visible attribution to the original Engine in your software documentation or about section.
+
+---
+
+This license is designed to keep the Engine itself open source, allow closed-source commercial games, and prevent selling the Engine as a product.
