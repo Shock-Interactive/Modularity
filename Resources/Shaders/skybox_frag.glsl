@@ -5,6 +5,12 @@ in vec3 fragPos;
 
 uniform float timeOfDay; // 0.0 = night, 0.25 = sunrise, 0.5 = day, 0.75 = sunset, 1.0 = midnight
 
+float hash(vec3 p) {
+    p = fract(p * 0.3183099 + 0.1);
+    p *= 17.0;
+    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+
 vec3 getSkyColor(vec3 direction, float tod) {
     float height = direction.y;
     
@@ -79,7 +85,6 @@ vec3 getSkyColor(vec3 direction, float tod) {
     skyColor += sunColor * (sunDisc + atmosphereGlow) * sunVisibility;
     skyColor += sunColor * sunIntensity * 0.3 * sunVisibility;
     
-    // Add stars at night
     if (tod < 0.2 || tod > 0.8) {
         float starIntensity = 1.0;
         if (tod < 0.2) {
@@ -88,9 +93,17 @@ vec3 getSkyColor(vec3 direction, float tod) {
             starIntensity = (tod - 0.8) / 0.2;
         }
         
-        // Simple star field using noise-like pattern
-        float stars = fract(sin(dot(direction.xz * 1000.0, vec2(12.9898, 78.233))) * 43758.5453);
-        stars = smoothstep(0.998, 1.0, stars) * starIntensity;
+        // Use normalized direction for stable star positions
+        vec3 starPos = normalize(direction) * 100.0;
+        float starNoise = hash(floor(starPos));
+        
+        // Create distinct bright stars
+        float stars = smoothstep(0.996, 1.0, starNoise) * starIntensity;
+        
+        // Add some variation in brightness
+        float brightness = hash(floor(starPos * 1.3)) * 0.5 + 0.5;
+        stars *= brightness;
+        
         skyColor += vec3(stars);
     }
     
