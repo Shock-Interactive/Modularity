@@ -2,6 +2,8 @@
 #include "../../include/Shaders/Shader.h"
 #include <glad/glad.h>
 #include <iostream>
+#include "../../src/ThirdParty/glm/glm.hpp"
+#include "../../src/ThirdParty/glm/gtc/type_ptr.hpp"
 
 // Skybox cube vertices (positions only, no normals/UVs needed)
 float skyboxVertices[] = {
@@ -79,13 +81,17 @@ void Skybox::setTimeOfDay(float time) {
 }
 
 void Skybox::draw(const float* view, const float* projection) {
+    // Properly reconstruct the view matrix from the float array
+    glm::mat4 viewMat = glm::make_mat4(view);
+    glm::mat4 projMat = glm::make_mat4(projection);
+    
     // Remove translation from view matrix (keep only rotation)
-    glm::mat4 viewMat = glm::mat4(glm::mat3(*((glm::mat4*)view)));
+    viewMat = glm::mat4(glm::mat3(viewMat));
     
     glDepthFunc(GL_LEQUAL);
     skyboxShader->use();
     skyboxShader->setMat4("view", viewMat);
-    skyboxShader->setMat4("projection", *((glm::mat4*)projection));
+    skyboxShader->setMat4("projection", projMat);
     skyboxShader->setFloat("timeOfDay", timeOfDay);
     
     glBindVertexArray(VAO);

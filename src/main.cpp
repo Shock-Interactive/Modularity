@@ -413,8 +413,13 @@ public:
 
         glm::vec3 targetVelocity(0.0f);
         if (isMoving) {
-            desiredDir = glm::normalize(desiredDir);
-            targetVelocity = desiredDir * currentSpeed;
+            float length = glm::length(desiredDir);
+            if (length > 0.0001f) {  // Check for near-zero length!
+                desiredDir = desiredDir / length;  // Manual normalize
+                targetVelocity = desiredDir * currentSpeed;
+            } else {
+                targetVelocity = glm::vec3(0.0f);  // Stop if no net direction
+            }
         }
 
         float smoothFactor = 1.0f - std::exp(-ACCELERATION * deltaTime);
@@ -517,9 +522,19 @@ public:
 
     void resize(int w, int h) {
         if (w <= 0 || h <= 0 || (w == currentWidth && h == currentHeight)) return;
+        
+        std::cout << "RESIZE TRIGGERED: " << w << "x" << h << std::endl;
+        
+        GLint currentFB;
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFB);
+        std::cout << "Framebuffer bound during resize: " << currentFB << " (should be " << framebuffer << ")" << std::endl;
+        
         currentWidth = w;
         currentHeight = h;
-
+        
+        // Explicitly bind OUR framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        
         glBindTexture(GL_TEXTURE_2D, viewportTexture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, currentWidth, currentHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
         glBindRenderbuffer(GL_RENDERBUFFER, rbo);
@@ -528,6 +543,8 @@ public:
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
             std::cerr << "Framebuffer incomplete after resize!\n";
         }
+        
+        std::cout << "Resize complete" << std::endl;
     }
 
     int getWidth() const { return currentWidth; }
@@ -539,8 +556,7 @@ public:
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        skybox->draw(glm::value_ptr(view), glm::value_ptr(proj));
-
+        // Setup shader FIRST before any rendering
         shader->use();
         shader->setMat4("view", view);
         shader->setMat4("projection", proj);
@@ -548,6 +564,35 @@ public:
         texture2->Bind(GL_TEXTURE1);
         shader->setInt("texture1", 0);
         shader->setInt("texture2", 1);
+    }
+
+    void renderSkybox(const glm::mat4& view, const glm::mat4& proj) {
+        if (skybox) {
+            // Save current state
+            GLint currentFB;
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFB);
+            
+            // Render skybox
+            glDepthFunc(GL_LEQUAL);
+            skybox->draw(glm::value_ptr(view), glm::value_ptr(proj));
+            glDepthFunc(GL_LESS);
+            
+            // Check if framebuffer changed
+            GLint afterFB;
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &afterFB);
+            
+            if (currentFB != afterFB) {
+                std::cerr << "WARNING: Framebuffer changed during skybox render! " 
+                        << currentFB << " -> " << afterFB << std::endl;
+                glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+            }
+            
+            // Rebind main shader
+            shader->use();
+            shader->setMat4("view", view);
+            shader->setMat4("projection", proj);
+            shader->use();
+        }
     }
 
     Skybox* getSkybox() { return skybox; }
@@ -1060,6 +1105,25 @@ public:
                 camera.processKeyboard(deltaTime, editorWindow);
             }
 
+
+            if (!showLauncher && projectManager.currentProject.isLoaded && rendererInitialized) {
+                glm::mat4 view = camera.getViewMatrix();
+                float aspect = static_cast<float>(viewportWidth) / static_cast<float>(viewportHeight);
+                if (aspect <= 0.0f) aspect = 1.0f;
+                glm::mat4 proj = glm::perspective(glm::radians(FOV), aspect, NEAR_PLANE, FAR_PLANE);
+
+                renderer.beginRender(view, proj);
+                
+                // Then draw scene objects on top
+                for (const auto& obj : sceneObjects) {
+                    renderer.renderObject(obj);
+                }
+
+                renderer.renderSkybox(view, proj);
+                
+                renderer.endRender();
+            }
+
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
@@ -1080,19 +1144,6 @@ public:
 
                 renderViewport();
                 renderDialogs();
-            }
-
-            if (!showLauncher && projectManager.currentProject.isLoaded && rendererInitialized) {
-                glm::mat4 view = camera.getViewMatrix();
-                float aspect = static_cast<float>(viewportWidth) / static_cast<float>(viewportHeight);
-                if (aspect <= 0.0f) aspect = 1.0f;
-                glm::mat4 proj = glm::perspective(glm::radians(FOV), aspect, NEAR_PLANE, FAR_PLANE);
-
-                renderer.beginRender(view, proj);
-                for (const auto& obj : sceneObjects) {
-                    renderer.renderObject(obj);
-                }
-                renderer.endRender();
             }
 
             int displayW, displayH;
