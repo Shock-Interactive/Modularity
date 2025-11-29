@@ -2,7 +2,7 @@
 #define WINDOW_H
 #include "../General/GlobalHeaders.h"
 #include <glad/glad.h>
-#include <GLFW/glfw3.h>
+#include "../../src/ThirdParty/glfw/include/GLFW/glfw3.h"
 
 class Window {
 public:

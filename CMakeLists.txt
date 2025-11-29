@@ -4,90 +4,76 @@ project(Modularity LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ===== Compiler flags =====
-if(MSVC)
-    add_compile_options(/W4 /O2)
-else()
-    add_compile_options(-Wall -Wextra -O2)
+# ==================== WINDOWS FIXES (only active on Windows) ====================
+if(WIN32)
+    add_compile_definitions(
+        NOMINMAX                  # Fixes std::min/std::max clash with Windows.h
+        WIN32_LEAN_AND_MEAN       # Speeds up Windows.h includes
+        _CRT_SECURE_NO_WARNINGS   # Silences strncpy, sscanf, etc. warnings
+    )
 endif()
 
-# ===== Include project headers =====
-include_directories(${PROJECT_SOURCE_DIR}/include)
+# ==================== Compiler flags ====================
+if(MSVC)
+    add_compile_options(/W4 /O2 /permissive- /MP)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -O2)
+endif()
 
-# ===== GLAD library =====
+# ==================== Third-party libraries ====================
+add_subdirectory(src/ThirdParty/glfw EXCLUDE_FROM_ALL)
+find_package(OpenGL REQUIRED)
+
+# GLAD
 add_library(glad STATIC src/ThirdParty/glad/glad.c)
 target_include_directories(glad PUBLIC src/ThirdParty/glad)
 
-# ===== GLM (header-only) =====
+# GLM (header-only)
 add_library(glm INTERFACE)
 target_include_directories(glm INTERFACE src/ThirdParty/glm)
 
-# ===== IMGUI =====
+# Dear ImGui
 set(IMGUI_DIR ${PROJECT_SOURCE_DIR}/src/ThirdParty/imgui)
-
-set(IMGUI_SOURCES
+add_library(imgui STATIC
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
     ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
-    # ---- back-ends -------------------------------------------------
     ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
 )
-
-add_library(imgui STATIC ${IMGUI_SOURCES})
-
-target_include_directories(imgui
-    PUBLIC
-        ${IMGUI_DIR}
-        ${IMGUI_DIR}/backends
-)
-
+target_include_directories(imgui PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
 target_link_libraries(imgui PRIVATE glfw)
 
-# ===== Collect all source files =====
+# ==================== Your code ====================
 file(GLOB_RECURSE PROJECT_SOURCES
     src/*.cpp
     src/*.c
 )
+list(FILTER PROJECT_SOURCES EXCLUDE REGEX "src/ThirdParty/|src/main\\.cpp")
 
-# Exclude third-party sources (glad, etc.)
-list(FILTER PROJECT_SOURCES EXCLUDE REGEX "src/ThirdParty/")
-
-# Optional: Exclude main.cpp from the core library if it exists in src/
-list(FILTER PROJECT_SOURCES EXCLUDE REGEX "src/main\\.cpp")
-
-# ===== Core library =====
-add_library(core ${PROJECT_SOURCES})
+add_library(core STATIC ${PROJECT_SOURCES})
 target_include_directories(core PUBLIC include)
-target_link_libraries(core PRIVATE glad glm imgui)
+target_link_libraries(core PUBLIC glad glm imgui)
 
-# ===== GLFW setup =====
-if(WIN32)
-    find_package(glfw3 REQUIRED)
-    set(PLATFORM_LIBS glfw3 opengl32 gdi32)
-else()
-    find_package(PkgConfig REQUIRED)
-    find_package(X11 REQUIRED)
-    pkg_check_modules(GLFW REQUIRED glfw3)
-    set(PLATFORM_LIBS ${GLFW_LIBRARIES} ${X11_LIBRARIES} GL dl pthread)
-    include_directories(${GLFW_INCLUDE_DIRS})
+# ==================== Executable ====================
+add_executable(main src/main.cpp)
+target_link_libraries(main PRIVATE core glfw OpenGL::GL)
+
+# Optional: remove console window on Windows (uncomment if you want GUI-only app)
+# if(WIN32)
+#     set_target_properties(main PROPERTIES WIN32_EXECUTABLE TRUE)
+# endif()
+
+# Linux needs these extra libs
+if(NOT WIN32)
+    target_link_libraries(main PRIVATE dl pthread X11)
 endif()
 
-# ===== Main executable =====
-add_executable(main src/main.cpp)
-target_link_libraries(main PRIVATE core glad glm imgui ${PLATFORM_LIBS})
-
-# ===== Optional: run target =====
-add_custom_target(run
-    COMMAND main
-    DEPENDS main
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
-
-# ===== Clean all build files =====
-add_custom_target(distclean
-    COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/*
-    COMMENT "Cleaning all build files..."
+# ==================== Copy Resources folder after build ====================
+add_custom_command(TARGET main POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/Resources
+        $<TARGET_FILE_DIR:main>/Resources
 )
