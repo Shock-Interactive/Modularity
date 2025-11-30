@@ -604,6 +604,10 @@ public:
     bool firstMouse = true;
 
     void processMouse(double xpos, double ypos) {
+        if (ImGuizmo::IsUsing() || ImGuizmo::IsOver()) {
+            // Don't process camera movement when gizmo is active
+            return;
+        }
         if (firstMouse) {
             lastX = xpos;
             lastY = ypos;
@@ -1341,6 +1345,38 @@ private:
     int selectedObjectId = -1;
     int nextObjectId = 0;
 
+    SceneObject* getSelectedObject() {
+        if (selectedObjectId == -1) return nullptr;
+        auto it = std::find_if(sceneObjects.begin(), sceneObjects.end(),
+            [this](const SceneObject& obj) { return obj.id == selectedObjectId; });
+        return (it != sceneObjects.end()) ? &(*it) : nullptr;
+    }
+
+    static void DecomposeMatrix(const glm::mat4& matrix, glm::vec3& pos, glm::vec3& rot, glm::vec3& scale) {
+        // Extract translation
+        pos = glm::vec3(matrix[3]);
+
+        // Extract scale
+        scale.x = glm::length(glm::vec3(matrix[0]));
+        scale.y = glm::length(glm::vec3(matrix[1]));
+        scale.z = glm::length(glm::vec3(matrix[2]));
+
+        // Extract rotation (convert to Euler angles)
+        glm::mat3 rotMat(matrix);
+        if (scale.x != 0.0f) rotMat[0] /= scale.x;
+        if (scale.y != 0.0f) rotMat[1] /= scale.y;
+        if (scale.z != 0.0f) rotMat[2] /= scale.z;
+
+        rot = glm::eulerAngles(glm::quat_cast(rotMat));
+    }
+
+    // Gizmo state
+    ImGuizmo::OPERATION mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+    ImGuizmo::MODE mCurrentGizmoMode = ImGuizmo::LOCAL;
+    bool useSnap = false;
+    float snapValue[3] = { 0.5f, 0.5f, 0.5f };
+    float rotationSnapValue = 15.0f;
+
     FileBrowser fileBrowser;
     bool viewportFullscreen = false;
     bool showHierarchy = true;
@@ -1391,6 +1427,7 @@ public:
         logToConsole("Engine initialized - Waiting for project selection");
         return true;
     }
+    
 
     bool initRenderer() {
         if (rendererInitialized) return true;
@@ -1579,6 +1616,20 @@ private:
         if (glfwGetKey(editorWindow, GLFW_KEY_N) == GLFW_RELEASE) {
             ctrlNPressed = false;
         }
+
+        // Gizmo operation hotkeys
+        if (ImGui::IsKeyPressed(ImGuiKey_Q)) mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+        if (ImGui::IsKeyPressed(ImGuiKey_W)) mCurrentGizmoOperation = ImGuizmo::ROTATE;
+        if (ImGui::IsKeyPressed(ImGuiKey_E)) mCurrentGizmoOperation = ImGuizmo::SCALE;
+        if (ImGui::IsKeyPressed(ImGuiKey_R)) mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
+
+        // Local / World toggle
+        if (ImGui::IsKeyPressed(ImGuiKey_Z)) {
+            mCurrentGizmoMode = (mCurrentGizmoMode == ImGuizmo::LOCAL) ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
+        }
+
+        // Snap toggle
+        if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl)) useSnap = !useSnap;
     }
 
     void OpenProjectPath(const std::string& path) {
@@ -2273,10 +2324,10 @@ private:
     void addConsoleMessage(const std::string& message, ConsoleMessageType type) {
         std::string prefix;
         switch (type) {
-            case ConsoleMessageType::Info: prefix = "[INFO]"; break;
-            case ConsoleMessageType::Warning: prefix = "[WARN]"; break;
-            case ConsoleMessageType::Error: prefix = "[ERROR]"; break;
-            case ConsoleMessageType::Success: prefix = "[SUCCESS]"; break;
+            case ConsoleMessageType::Info: prefix = "Info; "; break;
+            case ConsoleMessageType::Warning: prefix = "Warning: "; break;
+            case ConsoleMessageType::Error: prefix = "Error: "; break;
+            case ConsoleMessageType::Success: prefix = "Success: "; break;
         }
 
         auto now = std::chrono::system_clock::now();
@@ -2475,7 +2526,8 @@ private:
                 }
                 ImGui::EndMenu();
             }
-
+            
+            // So uh, why did i have to change one line in here???
             if (ImGui::BeginMenu("Window")) {
                 ImGui::MenuItem("Hierarchy", nullptr, &showHierarchy);
                 ImGui::MenuItem("Inspector", nullptr, &showInspector);
@@ -2828,7 +2880,6 @@ private:
                     
                     if (ImGui::Button("Reload Mesh", ImVec2(-1, 0))) {
                         std::string errMsg;
-                        // Force reload by clearing and reloading
                         int newId = g_objLoader.loadOBJ(obj.meshPath, errMsg);
                         if (newId >= 0) {
                             obj.meshId = newId;
@@ -2948,49 +2999,187 @@ private:
             const ImGuiViewport* viewport = ImGui::GetMainViewport();
             ImGui::SetNextWindowPos(viewport->WorkPos);
             ImGui::SetNextWindowSize(viewport->WorkSize);
-            viewportFlags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking;
+            viewportFlags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking;
         }
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::Begin("Viewport", nullptr, viewportFlags);
         ImGui::PopStyleVar();
 
-        ImVec2 vsize = ImGui::GetContentRegionAvail();
-        if (vsize.x > 0 && vsize.y > 0) {
-            viewportWidth = static_cast<int>(vsize.x);
-            viewportHeight = static_cast<int>(vsize.y);
+        ImVec2 fullAvail = ImGui::GetContentRegionAvail();
+
+        const float toolbarHeight = 20.0f;
+        ImVec2 imageSize = fullAvail;
+        imageSize.y = ImMax(1.0f, imageSize.y - toolbarHeight);
+
+        if (imageSize.x > 0 && imageSize.y > 0) {
+            viewportWidth  = static_cast<int>(imageSize.x);
+            viewportHeight = static_cast<int>(imageSize.y);
             if (rendererInitialized) {
                 renderer.resize(viewportWidth, viewportHeight);
             }
         }
 
+        // We'll forward this outside the block for camera focus
+        bool mouseOverViewportImage = false;
+
         if (rendererInitialized) {
-            renderer.beginRender(camera.getViewMatrix(), glm::perspective(glm::radians(FOV), (float)viewportWidth / viewportHeight, NEAR_PLANE, FAR_PLANE));
+            // RENDER SCENE TO TEXTURE
+            glm::mat4 proj = glm::perspective(
+                glm::radians(FOV),
+                (float)viewportWidth / (float)viewportHeight,
+                NEAR_PLANE, FAR_PLANE
+            );
+
+            glm::mat4 view = camera.getViewMatrix();
+
+            renderer.beginRender(view, proj);
             renderer.renderScene(camera, sceneObjects);
             unsigned int tex = renderer.getViewportTexture();
-            ImGui::Image((void*)(intptr_t)tex, vsize, ImVec2(0, 1), ImVec2(1, 0));
+
+            // DRAW THE VIEWPORT IMAGE (only top region, below we keep space for toolbar)
+            ImGui::Image((void*)(intptr_t)tex, imageSize, ImVec2(0, 1), ImVec2(1, 0));
+
+            // Get the exact rect of the image we just drew
+            ImVec2 imageMin = ImGui::GetItemRectMin();
+            ImVec2 imageMax = ImGui::GetItemRectMax();
+            mouseOverViewportImage = ImGui::IsItemHovered();
+
+            // GIZMO (Please work...)
+            SceneObject* selectedObj = getSelectedObject();
+            if (selectedObj) {
+                ImGuizmo::BeginFrame();
+                ImGuizmo::Enable(true);
+                ImGuizmo::SetOrthographic(false);
+                ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+
+                ImGuizmo::SetRect(
+                    imageMin.x,
+                    imageMin.y,
+                    imageMax.x - imageMin.x,
+                    imageMax.y - imageMin.y
+                );
+
+                // Build model matrix from your SceneObject
+                glm::mat4 modelMatrix(1.0f);
+                modelMatrix = glm::translate(modelMatrix, selectedObj->position);
+                modelMatrix = glm::rotate(modelMatrix, glm::radians(selectedObj->rotation.x), glm::vec3(1, 0, 0));
+                modelMatrix = glm::rotate(modelMatrix, glm::radians(selectedObj->rotation.y), glm::vec3(0, 1, 0));
+                modelMatrix = glm::rotate(modelMatrix, glm::radians(selectedObj->rotation.z), glm::vec3(0, 0, 1));
+                modelMatrix = glm::scale(modelMatrix, selectedObj->scale);
+
+                float* snapPtr = nullptr;
+                float snapRot[3] = { rotationSnapValue, rotationSnapValue, rotationSnapValue };
+
+                if (useSnap) {
+                    if (mCurrentGizmoOperation == ImGuizmo::ROTATE) {
+                        snapPtr = snapRot;
+                    } else {
+                        snapPtr = snapValue;
+                    }
+                }
+
+                ImGuizmo::Manipulate(
+                    glm::value_ptr(view),
+                    glm::value_ptr(proj),
+                    mCurrentGizmoOperation,
+                    mCurrentGizmoMode,
+                    glm::value_ptr(modelMatrix),
+                    nullptr,
+                    snapPtr
+                );
+
+                if (ImGuizmo::IsUsing()) {
+                    // Use ImGuizmo's own decompose helper to be safe
+                    float t[3], r[3], s[3];
+                    ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(modelMatrix), t, r, s);
+
+                    selectedObj->position = glm::vec3(t[0], t[1], t[2]);
+                    // r[] is already in degrees
+                    selectedObj->rotation = glm::vec3(r[0], r[1], r[2]);
+                    selectedObj->scale    = glm::vec3(s[0], s[1], s[2]);
+
+                    projectManager.currentProject.hasUnsavedChanges = true;
+                }
+            }
+
+            // Place it just under the image
+            ImGui::SetCursorPos(ImVec2(20, imageSize.y + 20));
+
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.95f);
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.14f, 0.9f));
+            ImGui::PushStyleColor(ImGuiCol_Border,  ImVec4(0.4f, 0.4f, 0.4f, 0.6f));
+            
+            // I hate how long this took to actually work. :sob:
+            if (ImGui::RadioButton("Move",   mCurrentGizmoOperation == ImGuizmo::TRANSLATE)) mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Rotate", mCurrentGizmoOperation == ImGuizmo::ROTATE))    mCurrentGizmoOperation = ImGuizmo::ROTATE;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Scale",  mCurrentGizmoOperation == ImGuizmo::SCALE))     mCurrentGizmoOperation = ImGuizmo::SCALE;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Uni",    mCurrentGizmoOperation == ImGuizmo::UNIVERSAL)) mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
+
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Local",  mCurrentGizmoMode == ImGuizmo::LOCAL))  mCurrentGizmoMode = ImGuizmo::LOCAL;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("World",  mCurrentGizmoMode == ImGuizmo::WORLD)) mCurrentGizmoMode = ImGuizmo::WORLD;
+
+            ImGui::SameLine();
+            ImGui::Checkbox("Snap", &useSnap);
+
+            if (useSnap) {
+                ImGui::SameLine();
+                switch (mCurrentGizmoOperation) {
+                    case ImGuizmo::TRANSLATE:
+                    case ImGuizmo::SCALE:
+                        ImGui::SetNextItemWidth(100);
+                        ImGui::DragFloat3("##snap", snapValue, 0.1f, 0.01f, 10.0f);
+                        break;
+                    case ImGuizmo::ROTATE:
+                        ImGui::SetNextItemWidth(80);
+                        ImGui::DragFloat("Angle", &rotationSnapValue, 1.0f, 0.0f, 90.0f);
+                        break;
+                }
+            }
+
+            ImGui::PopStyleColor(2);
+            ImGui::PopStyleVar();
+
+            // CAMERA FOCUS CLICK (only when not dragging gizmo and ONLY over the image)
+            if (mouseOverViewportImage &&
+                ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+                !ImGuizmo::IsUsing())
+            {
+                viewportController.setFocused(true);
+                cursorLocked = true;
+                glfwSetInputMode(editorWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                camera.firstMouse = true;
+            }
+
+            // ESC to release cursor
+            if (glfwGetKey(editorWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+                glfwSetInputMode(editorWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                viewportController.setFocused(false);
+                cursorLocked = false;
+                camera.firstMouse = true;
+            }
         }
 
-        bool mouseOverImage = ImGui::IsItemHovered();
-        bool windowFocused = ImGui::IsWindowFocused();
-
-        viewportController.updateFocusFromImGui(windowFocused);
-
-        if (mouseOverImage && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-            viewportController.setFocused(true);
-            viewportController.clearManualUnfocus();
-            cursorLocked = true;
-            glfwSetInputMode(editorWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-            camera.firstMouse = true;
-        }
-
+        // OVERLAY HINT TEXT (top-left over the image)
         ImGui::SetCursorPos(ImVec2(10, 30));
-        ImGui::TextColored(ImVec4(1, 1, 1, 0.7f), "WASD: Move | QE: Up/Down | Shift: Sprint | ESC: Release | F11: Fullscreen");
+        ImGui::TextColored(
+            ImVec4(1, 1, 1, 0.7f),
+            "WASD: Move | QE: Up/Down | Shift: Sprint | ESC: Release | F11: Fullscreen"
+        );
 
         if (viewportController.isViewportFocused()) {
             ImGui::SetCursorPos(ImVec2(10, 50));
             ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Camera Active");
         }
+
+        bool windowFocused = ImGui::IsWindowFocused();
+        viewportController.updateFocusFromImGui(windowFocused);
 
         ImGui::End();
     }

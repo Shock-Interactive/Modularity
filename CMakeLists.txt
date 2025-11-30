@@ -21,6 +21,7 @@ else()
 endif()
 
 # ==================== Third-party libraries ====================
+
 add_subdirectory(src/ThirdParty/glfw EXCLUDE_FROM_ALL)
 find_package(OpenGL REQUIRED)
 
@@ -32,9 +33,12 @@ target_include_directories(glad PUBLIC src/ThirdParty/glad)
 add_library(glm INTERFACE)
 target_include_directories(glm INTERFACE src/ThirdParty/glm)
 
-# ImGuizmo (header-only)
-add_library(imguizmo INTERFACE)
-target_include_directories(glm INTERFACE src/ThirdParty/ImGuizmo)
+# ImGuizmo ←←← THIS WAS THE BUG
+add_library(imguizmo STATIC
+    src/ThirdParty/ImGuizmo/ImGuizmo.cpp
+)
+target_include_directories(imguizmo PUBLIC src/ThirdParty/ImGuizmo)
+target_link_libraries(imguizmo PUBLIC imgui glm)   # ImGuizmo uses ImGui + GLM
 
 # Dear ImGui
 set(IMGUI_DIR ${PROJECT_SOURCE_DIR}/src/ThirdParty/imgui)
