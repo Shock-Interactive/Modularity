@@ -13,6 +13,7 @@
 #include "ThirdParty/imgui/imgui_internal.h"
 #include "ThirdParty/imgui/backends/imgui_impl_glfw.h"
 #include "ThirdParty/imgui/backends/imgui_impl_opengl3.h"
+#include "ThirdParty/ImGuizmo/ImGuizmo.h"
 #include "../include/Window/Window.h"
 #include "../include/Shaders/Shader.h"
 #include "../include/Textures/Texture.h"

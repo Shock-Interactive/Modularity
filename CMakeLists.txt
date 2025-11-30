@@ -32,6 +32,10 @@ target_include_directories(glad PUBLIC src/ThirdParty/glad)
 add_library(glm INTERFACE)
 target_include_directories(glm INTERFACE src/ThirdParty/glm)
 
+# ImGuizmo (header-only)
+add_library(imguizmo INTERFACE)
+target_include_directories(glm INTERFACE src/ThirdParty/ImGuizmo)
+
 # Dear ImGui
 set(IMGUI_DIR ${PROJECT_SOURCE_DIR}/src/ThirdParty/imgui)
 add_library(imgui STATIC
@@ -55,16 +59,16 @@ list(FILTER PROJECT_SOURCES EXCLUDE REGEX "src/ThirdParty/|src/main\\.cpp")
 
 add_library(core STATIC ${PROJECT_SOURCES})
 target_include_directories(core PUBLIC include)
-target_link_libraries(core PUBLIC glad glm imgui)
+target_link_libraries(core PUBLIC glad glm imgui imguizmo)
 
 # ==================== Executable ====================
 add_executable(main src/main.cpp)
 target_link_libraries(main PRIVATE core glfw OpenGL::GL)
 
 # Optional: remove console window on Windows (uncomment if you want GUI-only app)
-# if(WIN32)
-#     set_target_properties(main PROPERTIES WIN32_EXECUTABLE TRUE)
-# endif()
+#if(WIN32)
+#    set_target_properties(main PROPERTIES WIN32_EXECUTABLE TRUE)
+#endif()
 
 # Linux needs these extra libs
 if(NOT WIN32)
