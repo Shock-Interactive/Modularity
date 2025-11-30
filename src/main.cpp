@@ -2324,7 +2324,7 @@ private:
     void addConsoleMessage(const std::string& message, ConsoleMessageType type) {
         std::string prefix;
         switch (type) {
-            case ConsoleMessageType::Info: prefix = "Info; "; break;
+            case ConsoleMessageType::Info: prefix = "Info: "; break;
             case ConsoleMessageType::Warning: prefix = "Warning: "; break;
             case ConsoleMessageType::Error: prefix = "Error: "; break;
             case ConsoleMessageType::Success: prefix = "Success: "; break;
