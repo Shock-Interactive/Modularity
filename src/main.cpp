@@ -770,16 +770,16 @@ public:
         #ifdef _WIN32
         const char* appdata = std::getenv("APPDATA");
         if (appdata) {
-            appDataPath = fs::path(appdata) / ".modularity";
+            appDataPath = fs::path(appdata) / ".Modularity";
         } else {
             appDataPath = fs::current_path() / "AppData";
         }
         #else
         const char* home = std::getenv("HOME");
         if (home) {
-            appDataPath = fs::path(home) / ".modularity";
+            appDataPath = fs::path(home) / ".Modularity";
         } else {
-            appDataPath = fs::current_path() / ".modularity";
+            appDataPath = fs::current_path() / ".Modularity";
         }
         #endif
 
@@ -2052,7 +2052,7 @@ private:
 
             if (ImGui::BeginMenu("Help")) {
                 if (ImGui::MenuItem("About")) {
-                    addConsoleMessage("Game Engine v1.0 - ImGui Editor", ConsoleMessageType::Info);
+                    addConsoleMessage("Modularity - V1.0.1", ConsoleMessageType::Info);
                 }
                 ImGui::EndMenu();
             }
