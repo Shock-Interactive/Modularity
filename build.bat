@@ -42,7 +42,7 @@ xcopy /e /i /y "..\Resources" "Resources\" >nul
 echo.
 echo =========================================
 echo   SUCCESS! Your game is ready!
-echo   → build\Release\main.exe
+echo   At build\Release\main.exe
 echo =========================================
 echo.
 pause

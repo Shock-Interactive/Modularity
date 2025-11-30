@@ -37,48 +37,55 @@ constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 100.0f;
 constexpr float PI = 3.14159265359f;
 
+// Replace the existing float vertices[] array (lines ~50-100) with this full 8-float version (pos + normal + texcoord)
 float vertices[] = {
-    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-     0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+    // Back face (z = -0.5f)
+    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
+     0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
 
-    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-    -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+    // Front face (z = 0.5f)
+    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f,
 
-    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-    -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    // Left face (x = -0.5f)
+    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
 
-     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-     0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    // Right face (x = 0.5f)
+     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
 
-    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-     0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+    // Bottom face (y = -0.5f)
+    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
 
-    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-    -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+    // Top face (y = 0.5f)
+    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f
 };
 
 enum class ObjectType {
@@ -177,6 +184,7 @@ public:
     }
 };
 
+// Replace the entire generateSphere() function (around line ~200) with this version that adds normals (now 8 floats per vertex)
 std::vector<float> generateSphere(int segments = 32, int rings = 16) {
     std::vector<float> vertices;
 
@@ -194,9 +202,17 @@ std::vector<float> generateSphere(int segments = 32, int rings = 16) {
             float y = cosTheta;
             float z = sinPhi * sinTheta;
 
+            // Position
             vertices.push_back(x * 0.5f);
             vertices.push_back(y * 0.5f);
             vertices.push_back(z * 0.5f);
+
+            // Normal (same as position for unit sphere)
+            vertices.push_back(x);
+            vertices.push_back(y);
+            vertices.push_back(z);
+
+            // Texcoord
             vertices.push_back((float)seg / segments);
             vertices.push_back((float)ring / rings);
         }
@@ -209,24 +225,26 @@ std::vector<float> generateSphere(int segments = 32, int rings = 16) {
             int current = ring * stride + seg;
             int next = current + stride;
 
-            for (int i = 0; i < 5; i++) triangulated.push_back(vertices[current * 5 + i]);
-            for (int i = 0; i < 5; i++) triangulated.push_back(vertices[next * 5 + i]);
-            for (int i = 0; i < 5; i++) triangulated.push_back(vertices[(current + 1) * 5 + i]);
+            for (int i = 0; i < 8; i++) triangulated.push_back(vertices[current * 8 + i]);
+            for (int i = 0; i < 8; i++) triangulated.push_back(vertices[next * 8 + i]);
+            for (int i = 0; i < 8; i++) triangulated.push_back(vertices[(current + 1) * 8 + i]);
 
-            for (int i = 0; i < 5; i++) triangulated.push_back(vertices[(current + 1) * 5 + i]);
-            for (int i = 0; i < 5; i++) triangulated.push_back(vertices[next * 5 + i]);
-            for (int i = 0; i < 5; i++) triangulated.push_back(vertices[(next + 1) * 5 + i]);
+            for (int i = 0; i < 8; i++) triangulated.push_back(vertices[(current + 1) * 8 + i]);
+            for (int i = 0; i < 8; i++) triangulated.push_back(vertices[next * 8 + i]);
+            for (int i = 0; i < 8; i++) triangulated.push_back(vertices[(next + 1) * 8 + i]);
         }
     }
 
     return triangulated;
 }
 
+// Replace the entire generateCapsule() function (around line ~250) with this version that adds normals (now 8 floats per vertex)
 std::vector<float> generateCapsule(int segments = 16, int rings = 8) {
     std::vector<float> vertices;
     float cylinderHeight = 0.5f;
     float radius = 0.25f;
 
+    // Top hemisphere
     for (int ring = 0; ring <= rings / 2; ring++) {
         float theta = ring * PI / rings;
         float sinTheta = sin(theta);
@@ -241,14 +259,24 @@ std::vector<float> generateCapsule(int segments = 16, int rings = 8) {
             float y = cosTheta * radius + cylinderHeight;
             float z = sinPhi * sinTheta * radius;
 
+            // Position
             vertices.push_back(x);
             vertices.push_back(y);
             vertices.push_back(z);
+
+            // Normal (normalized direction from center)
+            glm::vec3 normal = glm::normalize(glm::vec3(x, y - cylinderHeight, z));
+            vertices.push_back(normal.x);
+            vertices.push_back(normal.y);
+            vertices.push_back(normal.z);
+
+            // Texcoord
             vertices.push_back((float)seg / segments);
             vertices.push_back((float)ring / (rings / 2));
         }
     }
 
+    // Cylinder body (top and bottom rings)
     for (int i = 0; i <= 1; i++) {
         float y = i == 0 ? cylinderHeight : -cylinderHeight;
         for (int seg = 0; seg <= segments; seg++) {
@@ -256,14 +284,24 @@ std::vector<float> generateCapsule(int segments = 16, int rings = 8) {
             float x = cos(phi) * radius;
             float z = sin(phi) * radius;
 
+            // Position
             vertices.push_back(x);
             vertices.push_back(y);
             vertices.push_back(z);
+
+            // Normal (outward for cylinder)
+            glm::vec3 normal = glm::normalize(glm::vec3(x, 0.0f, z));
+            vertices.push_back(normal.x);
+            vertices.push_back(normal.y);
+            vertices.push_back(normal.z);
+
+            // Texcoord
             vertices.push_back((float)seg / segments);
             vertices.push_back(0.5f);
         }
     }
 
+    // Bottom hemisphere
     for (int ring = rings / 2; ring <= rings; ring++) {
         float theta = ring * PI / rings;
         float sinTheta = sin(theta);
@@ -278,33 +316,39 @@ std::vector<float> generateCapsule(int segments = 16, int rings = 8) {
             float y = cosTheta * radius - cylinderHeight;
             float z = sinPhi * sinTheta * radius;
 
+            // Position
             vertices.push_back(x);
             vertices.push_back(y);
             vertices.push_back(z);
+
+            // Normal
+            glm::vec3 normal = glm::normalize(glm::vec3(x, y + cylinderHeight, z));
+            vertices.push_back(normal.x);
+            vertices.push_back(normal.y);
+            vertices.push_back(normal.z);
+
+            // Texcoord
             vertices.push_back((float)seg / segments);
             vertices.push_back((float)ring / rings);
         }
     }
 
     std::vector<float> triangulated;
-    int vertexCount = vertices.size() / 5;
     int stride = segments + 1;
-    int totalRings = rings + 3;
+    int totalRings = rings + 3;  // hemispheres + 3 for cylinder rings? Wait, adjust if needed
 
     for (int ring = 0; ring < totalRings - 1; ring++) {
         for (int seg = 0; seg < segments; seg++) {
             int current = ring * stride + seg;
             int next = current + stride;
 
-            if (current + 1 < vertexCount && next + 1 < vertexCount) {
-                for (int i = 0; i < 5; i++) triangulated.push_back(vertices[current * 5 + i]);
-                for (int i = 0; i < 5; i++) triangulated.push_back(vertices[next * 5 + i]);
-                for (int i = 0; i < 5; i++) triangulated.push_back(vertices[(current + 1) * 5 + i]);
+            for (int i = 0; i < 8; i++) triangulated.push_back(vertices[current * 8 + i]);
+            for (int i = 0; i < 8; i++) triangulated.push_back(vertices[next * 8 + i]);
+            for (int i = 0; i < 8; i++) triangulated.push_back(vertices[(current + 1) * 8 + i]);
 
-                for (int i = 0; i < 5; i++) triangulated.push_back(vertices[(current + 1) * 5 + i]);
-                for (int i = 0; i < 5; i++) triangulated.push_back(vertices[next * 5 + i]);
-                for (int i = 0; i < 5; i++) triangulated.push_back(vertices[(next + 1) * 5 + i]);
-            }
+            for (int i = 0; i < 8; i++) triangulated.push_back(vertices[(current + 1) * 8 + i]);
+            for (int i = 0; i < 8; i++) triangulated.push_back(vertices[next * 8 + i]);
+            for (int i = 0; i < 8; i++) triangulated.push_back(vertices[(next + 1) * 8 + i]);
         }
     }
 
@@ -317,21 +361,27 @@ private:
     int vertexCount;
 
 public:
-    Mesh(const float* vertexData, size_t size) {
-        vertexCount = size / (5 * sizeof(float));
+    Mesh(const float* vertexData, size_t dataSizeBytes) {
+        vertexCount = dataSizeBytes / (8 * sizeof(float));
 
         glGenVertexArrays(1, &VAO);
         glGenBuffers(1, &VBO);
 
         glBindVertexArray(VAO);
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, size, vertexData, GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, dataSizeBytes, vertexData, GL_STATIC_DRAW);
 
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        // 0: Position
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(0);
 
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+        // 1: Normal
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
         glEnableVertexAttribArray(1);
+
+        // 2: TexCoord
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+        glEnableVertexAttribArray(2);
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
@@ -401,68 +451,110 @@ public:
         }
         
         // Convert to our vertex format (pos + uv)
+        // Convert to our vertex format (pos + normal + uv)
         std::vector<float> vertices;
+        bool hasNormalsInFile = !attrib.normals.empty();
+
+        size_t totalIndices = 0;
         int faceCount = 0;
-        
+        for (const auto& shape : shapes) {
+            totalIndices += shape.mesh.indices.size();
+            faceCount += static_cast<int>(shape.mesh.num_face_vertices.size());
+        }
+        vertices.reserve(totalIndices * 8 / 3);  // rough estimate for triangulated verts
+
         for (const auto& shape : shapes) {
             size_t indexOffset = 0;
             for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
                 int fv = shape.mesh.num_face_vertices[f];
-                faceCount++;
-                
-                // Triangulate if needed (handle quads by splitting into triangles)
-                struct Vertex5 { float data[5]; };
-                std::vector<Vertex5> faceVerts;
-                
+
+                // Gather vertices for the face
+                struct TempVertex {
+                    glm::vec3 pos;
+                    glm::vec2 uv;
+                    glm::vec3 normal;
+                    bool hasNormal = false;
+                };
+                std::vector<TempVertex> faceVerts;
+
                 for (int v = 0; v < fv; v++) {
                     tinyobj::index_t idx = shape.mesh.indices[indexOffset + v];
-                    
-                    float vx = attrib.vertices[3 * idx.vertex_index + 0];
-                    float vy = attrib.vertices[3 * idx.vertex_index + 1];
-                    float vz = attrib.vertices[3 * idx.vertex_index + 2];
-                    
-                    float tx = 0.0f, ty = 0.0f;
+
+                    TempVertex tv;
+                    tv.pos.x = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
+                    tv.pos.y = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
+                    tv.pos.z = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+
                     if (idx.texcoord_index >= 0 && !attrib.texcoords.empty()) {
-                        tx = attrib.texcoords[2 * idx.texcoord_index + 0];
-                        ty = attrib.texcoords[2 * idx.texcoord_index + 1];
+                        tv.uv.x = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+                        tv.uv.y = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+                    } else {
+                        tv.uv = glm::vec2(0.0f);
                     }
-                    
-                    Vertex5 vert;
-                    vert.data[0] = vx;
-                    vert.data[1] = vy;
-                    vert.data[2] = vz;
-                    vert.data[3] = tx;
-                    vert.data[4] = ty;
-                    faceVerts.push_back(vert);
+
+                    if (idx.normal_index >= 0 && hasNormalsInFile) {
+                        tv.normal.x = attrib.normals[3 * size_t(idx.normal_index) + 0];
+                        tv.normal.y = attrib.normals[3 * size_t(idx.normal_index) + 1];
+                        tv.normal.z = attrib.normals[3 * size_t(idx.normal_index) + 2];
+                        tv.hasNormal = true;
+                    }
+
+                    faceVerts.push_back(tv);
                 }
-                
-                // Triangulate: fan from first vertex
+
+                // Compute face normal if no normals in file
+                if (!hasNormalsInFile && fv >= 3) {
+                    glm::vec3 v0 = faceVerts[0].pos;
+                    glm::vec3 v1 = faceVerts[1].pos;
+                    glm::vec3 v2 = faceVerts[2].pos;
+                    glm::vec3 faceNormal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+
+                    for (auto& tv : faceVerts) {
+                        tv.normal = faceNormal;
+                        tv.hasNormal = true;
+                    }
+                }
+
+                // Triangulate fan
                 for (int v = 1; v < fv - 1; v++) {
-                    // Triangle: 0, v, v+1
-                    for (int i = 0; i < 5; i++) vertices.push_back(faceVerts[0].data[i]);
-                    for (int i = 0; i < 5; i++) vertices.push_back(faceVerts[v].data[i]);
-                    for (int i = 0; i < 5; i++) vertices.push_back(faceVerts[v + 1].data[i]);
+                    const TempVertex* tri[3] = { &faceVerts[0], &faceVerts[v], &faceVerts[v+1] };
+
+                    for (int i = 0; i < 3; i++) {
+                        // Pos
+                        vertices.push_back(tri[i]->pos.x);
+                        vertices.push_back(tri[i]->pos.y);
+                        vertices.push_back(tri[i]->pos.z);
+
+                        // Normal
+                        vertices.push_back(tri[i]->normal.x);
+                        vertices.push_back(tri[i]->normal.y);
+                        vertices.push_back(tri[i]->normal.z);
+
+                        // UV
+                        vertices.push_back(tri[i]->uv.x);
+                        vertices.push_back(tri[i]->uv.y);
+                    }
                 }
-                
+
                 indexOffset += fv;
             }
         }
-        
+
         if (vertices.empty()) {
             errorMsg += "No vertices found in OBJ file";
             return -1;
         }
-        
+
         // Create mesh
         LoadedMesh loaded;
         loaded.path = filepath;
         loaded.name = fs::path(filepath).stem().string();
         loaded.mesh = std::make_unique<Mesh>(vertices.data(), vertices.size() * sizeof(float));
-        loaded.vertexCount = vertices.size() / 5;
+        loaded.vertexCount = static_cast<int>(vertices.size() / 8);
         loaded.faceCount = faceCount;
-        loaded.hasNormals = !attrib.normals.empty();
+        loaded.hasNormals = hasNormalsInFile;
         loaded.hasTexCoords = !attrib.texcoords.empty();
-        
+
         loadedMeshes.push_back(std::move(loaded));
         return static_cast<int>(loadedMeshes.size() - 1);
     }
@@ -790,6 +882,56 @@ public:
                 }
                 break;
         }
+    }
+
+    void renderScene(const Camera& camera, const std::vector<SceneObject>& sceneObjects) {
+        shader->use();
+        shader->setMat4("view", camera.getViewMatrix());
+        shader->setMat4("projection", glm::perspective(glm::radians(FOV), (float)currentWidth / (float)currentHeight, NEAR_PLANE, FAR_PLANE));
+        shader->setVec3("lightPos", glm::vec3(4.0f, 6.0f, 4.0f));  // Slightly higher and farther
+        shader->setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
+        shader->setFloat("ambientStrength", 0.25f);
+        shader->setFloat("specularStrength", 0.8f);
+        shader->setFloat("shininess", 64.0f);
+        shader->setFloat("mixAmount", 0.3f);
+
+        texture1->Bind(0);
+        texture2->Bind(1);
+
+        for (const auto& obj : sceneObjects) {
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, obj.position);
+            model = glm::rotate(model, glm::radians(obj.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+            model = glm::rotate(model, glm::radians(obj.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::rotate(model, glm::radians(obj.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+            model = glm::scale(model, obj.scale);
+
+            shader->setMat4("model", model);
+
+            Mesh* meshToDraw = nullptr;
+            if (obj.type == ObjectType::Cube) meshToDraw = cubeMesh;
+            else if (obj.type == ObjectType::Sphere) meshToDraw = sphereMesh;
+            else if (obj.type == ObjectType::Capsule) meshToDraw = capsuleMesh;
+            else if (obj.type == ObjectType::OBJMesh && obj.meshId != -1) {
+                meshToDraw = g_objLoader.getMesh(obj.meshId);
+            }
+
+            if (meshToDraw) {
+                meshToDraw->draw();
+            }
+        }
+
+        // Skybox last
+        if (skybox) {
+            glm::mat4 view = camera.getViewMatrix();
+            glm::mat4 proj = glm::perspective(glm::radians(FOV), 
+                                            (float)currentWidth / currentHeight, 
+                                            NEAR_PLANE, FAR_PLANE);
+
+            skybox->draw(glm::value_ptr(view), glm::value_ptr(proj));
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     void endRender() {
@@ -2823,6 +2965,8 @@ private:
         }
 
         if (rendererInitialized) {
+            renderer.beginRender(camera.getViewMatrix(), glm::perspective(glm::radians(FOV), (float)viewportWidth / viewportHeight, NEAR_PLANE, FAR_PLANE));
+            renderer.renderScene(camera, sceneObjects);
             unsigned int tex = renderer.getViewportTexture();
             ImGui::Image((void*)(intptr_t)tex, vsize, ImVec2(0, 1), ImVec2(1, 0));
         }
