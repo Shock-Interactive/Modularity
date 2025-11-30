@@ -7,6 +7,8 @@ echo   Modularity - VS 2026 Build
 echo ================================
 echo.
 
+git submodule update --init --recursive
+
 :: Clean old build
 if exist build rmdir /s /q build
 

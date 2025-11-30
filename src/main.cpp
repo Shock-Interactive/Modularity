@@ -14,12 +14,14 @@
 #include "ThirdParty/imgui/backends/imgui_impl_glfw.h"
 #include "ThirdParty/imgui/backends/imgui_impl_opengl3.h"
 #include "ThirdParty/ImGuizmo/ImGuizmo.h"
+#include "ThirdParty/glm/gtc/matrix_transform.hpp"
+#include "ThirdParty/glm/gtc/type_ptr.hpp"
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "../include/ThirdParty/tiny_obj_loader.h"
 #include "../include/Window/Window.h"
 #include "../include/Shaders/Shader.h"
 #include "../include/Textures/Texture.h"
 #include "../include/Skybox/Skybox.h"
-#include "ThirdParty/glm/gtc/matrix_transform.hpp"
-#include "ThirdParty/glm/gtc/type_ptr.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -82,7 +84,8 @@ float vertices[] = {
 enum class ObjectType {
     Cube,
     Sphere,
-    Capsule
+    Capsule,
+    OBJMesh  // New type for loaded OBJ models
 };
 
 enum class ConsoleMessageType {
@@ -103,6 +106,8 @@ public:
     int parentId = -1;
     std::vector<int> childIds;
     bool isExpanded = true;
+    std::string meshPath;  // Path to OBJ file (for OBJMesh type)
+    int meshId = -1;       // Index into loaded meshes cache
 
     SceneObject(const std::string& name, ObjectType type, int id)
         : name(name), type(type), position(0.0f), rotation(0.0f), scale(1.0f), id(id) {}
@@ -162,6 +167,13 @@ public:
         if (ext == ".obj" || ext == ".fbx" || ext == ".gltf") return "[M]";
         if (ext == ".txt" || ext == ".md") return "[T]";
         return "[F]";
+    }
+    
+    bool isOBJFile(const fs::directory_entry& entry) const {
+        if (entry.is_directory()) return false;
+        std::string ext = entry.path().extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        return ext == ".obj";
     }
 };
 
@@ -335,7 +347,157 @@ public:
         glDrawArrays(GL_TRIANGLES, 0, vertexCount);
         glBindVertexArray(0);
     }
+    
+    int getVertexCount() const { return vertexCount; }
 };
+
+class OBJLoader {
+public:
+    struct LoadedMesh {
+        std::string path;
+        std::unique_ptr<Mesh> mesh;
+        std::string name;
+        int vertexCount = 0;
+        int faceCount = 0;
+        bool hasNormals = false;
+        bool hasTexCoords = false;
+    };
+    
+private:
+    std::vector<LoadedMesh> loadedMeshes;
+    
+public:
+    // Load an OBJ file and return index into cache, or -1 on failure
+    int loadOBJ(const std::string& filepath, std::string& errorMsg) {
+        // Check if already loaded
+        for (size_t i = 0; i < loadedMeshes.size(); i++) {
+            if (loadedMeshes[i].path == filepath) {
+                return static_cast<int>(i);
+            }
+        }
+        
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string warn, err;
+        
+        std::string baseDir = fs::path(filepath).parent_path().string();
+        if (!baseDir.empty()) baseDir += "/";
+        
+        bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, 
+                                    filepath.c_str(), baseDir.c_str());
+        
+        if (!warn.empty()) {
+            errorMsg += "Warning: " + warn + "\n";
+        }
+        
+        if (!err.empty()) {
+            errorMsg += "Error: " + err + "\n";
+        }
+        
+        if (!ret || shapes.empty()) {
+            errorMsg += "Failed to load OBJ file: " + filepath;
+            return -1;
+        }
+        
+        // Convert to our vertex format (pos + uv)
+        std::vector<float> vertices;
+        int faceCount = 0;
+        
+        for (const auto& shape : shapes) {
+            size_t indexOffset = 0;
+            for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+                int fv = shape.mesh.num_face_vertices[f];
+                faceCount++;
+                
+                // Triangulate if needed (handle quads by splitting into triangles)
+                struct Vertex5 { float data[5]; };
+                std::vector<Vertex5> faceVerts;
+                
+                for (int v = 0; v < fv; v++) {
+                    tinyobj::index_t idx = shape.mesh.indices[indexOffset + v];
+                    
+                    float vx = attrib.vertices[3 * idx.vertex_index + 0];
+                    float vy = attrib.vertices[3 * idx.vertex_index + 1];
+                    float vz = attrib.vertices[3 * idx.vertex_index + 2];
+                    
+                    float tx = 0.0f, ty = 0.0f;
+                    if (idx.texcoord_index >= 0 && !attrib.texcoords.empty()) {
+                        tx = attrib.texcoords[2 * idx.texcoord_index + 0];
+                        ty = attrib.texcoords[2 * idx.texcoord_index + 1];
+                    }
+                    
+                    Vertex5 vert;
+                    vert.data[0] = vx;
+                    vert.data[1] = vy;
+                    vert.data[2] = vz;
+                    vert.data[3] = tx;
+                    vert.data[4] = ty;
+                    faceVerts.push_back(vert);
+                }
+                
+                // Triangulate: fan from first vertex
+                for (int v = 1; v < fv - 1; v++) {
+                    // Triangle: 0, v, v+1
+                    for (int i = 0; i < 5; i++) vertices.push_back(faceVerts[0].data[i]);
+                    for (int i = 0; i < 5; i++) vertices.push_back(faceVerts[v].data[i]);
+                    for (int i = 0; i < 5; i++) vertices.push_back(faceVerts[v + 1].data[i]);
+                }
+                
+                indexOffset += fv;
+            }
+        }
+        
+        if (vertices.empty()) {
+            errorMsg += "No vertices found in OBJ file";
+            return -1;
+        }
+        
+        // Create mesh
+        LoadedMesh loaded;
+        loaded.path = filepath;
+        loaded.name = fs::path(filepath).stem().string();
+        loaded.mesh = std::make_unique<Mesh>(vertices.data(), vertices.size() * sizeof(float));
+        loaded.vertexCount = vertices.size() / 5;
+        loaded.faceCount = faceCount;
+        loaded.hasNormals = !attrib.normals.empty();
+        loaded.hasTexCoords = !attrib.texcoords.empty();
+        
+        loadedMeshes.push_back(std::move(loaded));
+        return static_cast<int>(loadedMeshes.size() - 1);
+    }
+    
+    // Get mesh by index
+    Mesh* getMesh(int index) {
+        if (index < 0 || index >= static_cast<int>(loadedMeshes.size())) {
+            return nullptr;
+        }
+        return loadedMeshes[index].mesh.get();
+    }
+    
+    // Get mesh info
+    const LoadedMesh* getMeshInfo(int index) const {
+        if (index < 0 || index >= static_cast<int>(loadedMeshes.size())) {
+            return nullptr;
+        }
+        return &loadedMeshes[index];
+    }
+    
+    // Get all loaded meshes (for UI display)
+    const std::vector<LoadedMesh>& getAllMeshes() const {
+        return loadedMeshes;
+    }
+    
+    // Clear all loaded meshes
+    void clear() {
+        loadedMeshes.clear();
+    }
+    
+    size_t getMeshCount() const { return loadedMeshes.size(); }
+};
+
+// Global OBJ loader instance
+OBJLoader g_objLoader;
 
 class Camera {
 public:
@@ -411,15 +573,21 @@ public:
             desiredDir += up;
             isMoving = true;
         }
+        if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
+        if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
 
         glm::vec3 targetVelocity(0.0f);
         if (isMoving) {
             float length = glm::length(desiredDir);
-            if (length > 0.0001f) {  // Check for near-zero length!
-                desiredDir = desiredDir / length;  // Manual normalize
+            if (length > 0.0001f) {
+                desiredDir = desiredDir / length;
                 targetVelocity = desiredDir * currentSpeed;
             } else {
-                targetVelocity = glm::vec3(0.0f);  // Stop if no net direction
+                targetVelocity = glm::vec3(0.0f);
             }
         }
 
@@ -533,7 +701,6 @@ public:
         currentWidth = w;
         currentHeight = h;
         
-        // Explicitly bind OUR framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         
         glBindTexture(GL_TEXTURE_2D, viewportTexture);
@@ -557,7 +724,6 @@ public:
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Setup shader FIRST before any rendering
         shader->use();
         shader->setMat4("view", view);
         shader->setMat4("projection", proj);
@@ -569,16 +735,13 @@ public:
 
     void renderSkybox(const glm::mat4& view, const glm::mat4& proj) {
         if (skybox) {
-            // Save current state
             GLint currentFB;
             glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFB);
             
-            // Render skybox
             glDepthFunc(GL_LEQUAL);
             skybox->draw(glm::value_ptr(view), glm::value_ptr(proj));
             glDepthFunc(GL_LESS);
             
-            // Check if framebuffer changed
             GLint afterFB;
             glGetIntegerv(GL_FRAMEBUFFER_BINDING, &afterFB);
             
@@ -588,7 +751,6 @@ public:
                 glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
             }
             
-            // Rebind main shader
             shader->use();
             shader->setMat4("view", view);
             shader->setMat4("projection", proj);
@@ -617,6 +779,15 @@ public:
                 break;
             case ObjectType::Capsule:
                 capsuleMesh->draw();
+                break;
+            case ObjectType::OBJMesh:
+                // Draw loaded OBJ mesh
+                if (obj.meshId >= 0) {
+                    Mesh* objMesh = g_objLoader.getMesh(obj.meshId);
+                    if (objMesh) {
+                        objMesh->draw();
+                    }
+                }
                 break;
         }
     }
@@ -886,7 +1057,7 @@ public:
             if (!file.is_open()) return false;
 
             file << "# Scene File\n";
-            file << "version=1\n";
+            file << "version=2\n";  // Bumped version for new format
             file << "nextId=" << nextId << "\n";
             file << "objectCount=" << objects.size() << "\n";
             file << "\n";
@@ -900,6 +1071,11 @@ public:
                 file << "position=" << obj.position.x << "," << obj.position.y << "," << obj.position.z << "\n";
                 file << "rotation=" << obj.rotation.x << "," << obj.rotation.y << "," << obj.rotation.z << "\n";
                 file << "scale=" << obj.scale.x << "," << obj.scale.y << "," << obj.scale.z << "\n";
+                
+                // Save mesh path for OBJ meshes
+                if (obj.type == ObjectType::OBJMesh && !obj.meshPath.empty()) {
+                    file << "meshPath=" << obj.meshPath << "\n";
+                }
 
                 file << "children=";
                 for (size_t i = 0; i < obj.childIds.size(); i++) {
@@ -972,6 +1148,13 @@ public:
                                &currentObj->scale.x,
                                &currentObj->scale.y,
                                &currentObj->scale.z);
+                    } else if (key == "meshPath") {
+                        currentObj->meshPath = value;
+                        // Reload the mesh
+                        if (!value.empty() && currentObj->type == ObjectType::OBJMesh) {
+                            std::string err;
+                            currentObj->meshId = g_objLoader.loadOBJ(value, err);
+                        }
                     } else if (key == "children" && !value.empty()) {
                         std::stringstream ss(value);
                         std::string item;
@@ -1034,6 +1217,10 @@ private:
     char newSceneName[128] = "";
     char saveSceneAsName[128] = "";
     bool rendererInitialized = false;
+    
+    bool showImportOBJDialog = false;
+    std::string pendingOBJPath;
+    char importOBJName[128] = "";
 
 public:
     Engine() = default;
@@ -1115,7 +1302,6 @@ public:
 
                 renderer.beginRender(view, proj);
                 
-                // Then draw scene objects on top
                 for (const auto& obj : sceneObjects) {
                     renderer.renderObject(obj);
                 }
@@ -1181,6 +1367,41 @@ public:
     }
 
 private:
+    void importOBJToScene(const std::string& filepath, const std::string& objectName) {
+        std::string errorMsg;
+        int meshId = g_objLoader.loadOBJ(filepath, errorMsg);
+        
+        if (meshId < 0) {
+            addConsoleMessage("Failed to load OBJ: " + errorMsg, ConsoleMessageType::Error);
+            return;
+        }
+        
+        // Create scene object
+        int id = nextObjectId++;
+        std::string name = objectName.empty() ? fs::path(filepath).stem().string() : objectName;
+        
+        SceneObject obj(name, ObjectType::OBJMesh, id);
+        obj.meshPath = filepath;
+        obj.meshId = meshId;
+        
+        sceneObjects.push_back(obj);
+        selectedObjectId = id;
+        
+        if (projectManager.currentProject.isLoaded) {
+            projectManager.currentProject.hasUnsavedChanges = true;
+        }
+        
+        const auto* meshInfo = g_objLoader.getMeshInfo(meshId);
+        if (meshInfo) {
+            addConsoleMessage("Imported OBJ: " + name + " (" + 
+                            std::to_string(meshInfo->vertexCount) + " vertices, " +
+                            std::to_string(meshInfo->faceCount) + " faces)", 
+                            ConsoleMessageType::Success);
+        } else {
+            addConsoleMessage("Imported OBJ: " + name, ConsoleMessageType::Success);
+        }
+    }
+
     void handleKeyboardShortcuts() {
         static bool f11Pressed = false;
         if (glfwGetKey(editorWindow, GLFW_KEY_F11) == GLFW_PRESS && !f11Pressed) {
@@ -1218,81 +1439,69 @@ private:
         }
     }
 
-    void renderLauncher()
-    {
-        ImGuiIO& io = ImGui::GetIO();
-        ImVec2 center(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
-        ImVec2 windowSize(720.0f, 480.0f);
+    void OpenProjectPath(const std::string& path) {
+        if (projectManager.loadProject(path)) {
+            if (!initRenderer()) {
+                addConsoleMessage("Error: Failed to initialize renderer!", ConsoleMessageType::Error);
+            } else {
+                showLauncher = false;
+                loadRecentScenes();
+                addConsoleMessage("Opened project: " + projectManager.currentProject.name, ConsoleMessageType::Info);
+            }
+        } else {
+            addConsoleMessage("Error opening project: " + projectManager.errorMessage, ConsoleMessageType::Error);
+        }
+    }
 
-        ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(windowSize, ImGuiCond_Always);
+    void renderLauncher() {
+        ImGuiIO& io = ImGui::GetIO();
+        ImVec2 displaySize = io.DisplaySize;
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.08f, 0.08f, 0.09f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(displaySize);
 
         ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoResize   |
+            ImGuiWindowFlags_NoMove     |
             ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoDocking |
-            ImGuiWindowFlags_NoTitleBar;
+            ImGuiWindowFlags_NoDocking  |
+            ImGuiWindowFlags_NoBringToFrontOnFocus;
 
-        // Soft, subtle window look
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 20.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.07f, 0.07f, 0.08f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Border,   ImVec4(1.0f, 1.0f, 1.0f, 0.10f));
-
-        if (ImGui::Begin("Modularity - Project Launcher", nullptr, flags))
+        if (ImGui::Begin("Launcher", nullptr, flags))
         {
-            // Header
-            ImGui::TextColored(ImVec4(0.85f, 0.85f, 0.9f, 1.0f), "Modularity - Project Launcher");
-            ImGui::TextDisabled("Version 1.0.1");
+            float leftPanelWidth = 280.0f;
+
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.06f, 0.06f, 0.07f, 1.0f));
+            ImGui::BeginChild("LauncherLeft", ImVec2(leftPanelWidth, 0), true);
+            ImGui::PopStyleColor();
+
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(0.45f, 0.72f, 0.95f, 1.0f), "MODULARITY");
+            ImGui::TextDisabled("Game Engine");
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
 
-            // Helper lambda to open a project
-            auto OpenProjectPath = [&](const std::string& path)
-            {
-                if (projectManager.loadProject(path))
-                {
-                    if (!initRenderer())
-                    {
-                        addConsoleMessage("Error: Failed to initialize renderer!", ConsoleMessageType::Error);
-                        return;
-                    }
-
-                    showLauncher = false;
-                    loadRecentScenes();
-                    addConsoleMessage("Opened project: " + projectManager.currentProject.name,
-                                    ConsoleMessageType::Info);
-                }
-                else
-                {
-                    addConsoleMessage("Error opening project: " + projectManager.errorMessage,
-                                    ConsoleMessageType::Error);
-                }
-            };
-
-            // -------- Two-column layout --------
-            float leftWidth = 220.0f;
-
-            // LEFT: Get Started / Quick Actions
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.10f, 0.10f, 0.11f, 1.0f));
-            ImGui::BeginChild("LauncherLeft", ImVec2(leftWidth, 0), true);
-            ImGui::PopStyleColor();
-
             ImGui::TextColored(ImVec4(0.75f, 0.75f, 0.78f, 1.0f), "GET STARTED");
             ImGui::Spacing();
 
-            // Main action buttons
-            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.20f, 0.45f, 0.75f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.55f, 0.85f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.18f, 0.40f, 0.70f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.38f, 0.55f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.48f, 0.68f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.20f, 0.42f, 0.60f, 1.0f));
 
             if (ImGui::Button("New Project", ImVec2(-1, 36.0f)))
             {
                 projectManager.showNewProjectDialog = true;
                 projectManager.errorMessage.clear();
-                std::strcpy(projectManager.newProjectName, "NewProject");
+                std::memset(projectManager.newProjectName, 0, sizeof(projectManager.newProjectName));
 
                 #ifdef _WIN32
                 char documentsPath[MAX_PATH];
@@ -1317,7 +1526,7 @@ private:
                 projectManager.errorMessage.clear();
             }
 
-            ImGui::PopStyleColor(3); // buttons
+            ImGui::PopStyleColor(3);
 
             ImGui::Spacing();
             ImGui::Spacing();
@@ -1341,7 +1550,6 @@ private:
 
             ImGui::EndChild();
 
-            // RIGHT: Recent Projects
             ImGui::SameLine();
 
             ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.10f, 0.10f, 0.11f, 1.0f));
@@ -1364,12 +1572,10 @@ private:
                     const auto& rp = projectManager.recentProjects[i];
                     ImGui::PushID(static_cast<int>(i));
 
-                    // Build label with name + path on 2 lines
                     char label[512];
                     std::snprintf(label, sizeof(label), "%s\n%s",
                                 rp.name.c_str(), rp.path.c_str());
 
-                    // Soft highlight style
                     ImGui::PushStyleColor(ImGuiCol_Header,        ImVec4(0.20f, 0.30f, 0.45f, 0.40f));
                     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.25f, 0.38f, 0.55f, 0.70f));
                     ImGui::PushStyleColor(ImGuiCol_HeaderActive,  ImVec4(0.20f, 0.35f, 0.60f, 0.90f));
@@ -1383,13 +1589,11 @@ private:
 
                     ImGui::PopStyleColor(3);
 
-                    // Single click OR double click opens
                     if (selected || ImGui::IsItemClicked(ImGuiMouseButton_Left))
                     {
                         OpenProjectPath(rp.path);
                     }
 
-                    // Context menu
                     if (ImGui::BeginPopupContextItem("RecentProjectContext"))
                     {
                         if (ImGui::MenuItem("Open"))
@@ -1405,7 +1609,7 @@ private:
                             projectManager.saveRecentProjects();
                             ImGui::EndPopup();
                             ImGui::PopID();
-                            break; // collection changed
+                            break;
                         }
 
                         ImGui::EndPopup();
@@ -1422,14 +1626,13 @@ private:
 
             ImGui::TextDisabled("Modularity Engine - Version 1.0.1");
 
-            ImGui::EndChild(); // LauncherRight
+            ImGui::EndChild();
         }
 
         ImGui::End();
         ImGui::PopStyleColor(2);
         ImGui::PopStyleVar(3);
 
-        // Dialogs on top
         if (projectManager.showNewProjectDialog)
             renderNewProjectDialog();
         if (projectManager.showOpenProjectDialog)
@@ -1749,6 +1952,50 @@ private:
             }
             ImGui::End();
         }
+        
+        // OBJ Import dialog
+        if (showImportOBJDialog) {
+            ImGuiIO& io = ImGui::GetIO();
+            ImVec2 center = ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
+            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+            ImGui::SetNextWindowSize(ImVec2(400, 160), ImGuiCond_Appearing);
+
+            if (ImGui::Begin("Import OBJ Model", &showImportOBJDialog,
+                            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDocking)) {
+                ImGui::Text("File: %s", fs::path(pendingOBJPath).filename().string().c_str());
+                ImGui::TextDisabled("%s", pendingOBJPath.c_str());
+                
+                ImGui::Spacing();
+                
+                ImGui::Text("Object Name:");
+                ImGui::SetNextItemWidth(-1);
+                ImGui::InputText("##ImportOBJName", importOBJName, sizeof(importOBJName));
+
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                float buttonWidth = 80;
+                ImGui::SetCursorPosX(ImGui::GetWindowWidth() - buttonWidth * 2 - 20);
+
+                if (ImGui::Button("Cancel", ImVec2(buttonWidth, 0))) {
+                    showImportOBJDialog = false;
+                    pendingOBJPath.clear();
+                }
+                ImGui::SameLine();
+                
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.3f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 0.4f, 1.0f));
+                if (ImGui::Button("Import", ImVec2(buttonWidth, 0))) {
+                    importOBJToScene(pendingOBJPath, importOBJName);
+                    showImportOBJDialog = false;
+                    pendingOBJPath.clear();
+                    memset(importOBJName, 0, sizeof(importOBJName));
+                }
+                ImGui::PopStyleColor(2);
+            }
+            ImGui::End();
+        }
     }
 
     void renderProjectBrowserPanel() {
@@ -1809,6 +2056,48 @@ private:
 
             if (scenes.empty()) {
                 ImGui::TextDisabled("No scenes yet");
+            }
+        }
+        
+        if (ImGui::CollapsingHeader("Loaded Meshes")) {
+            const auto& meshes = g_objLoader.getAllMeshes();
+            if (meshes.empty()) {
+                ImGui::TextDisabled("No meshes loaded");
+                ImGui::TextDisabled("Import .obj files from File Browser");
+            } else {
+                for (size_t i = 0; i < meshes.size(); i++) {
+                    const auto& mesh = meshes[i];
+                    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf |
+                                              ImGuiTreeNodeFlags_SpanAvailWidth |
+                                              ImGuiTreeNodeFlags_NoTreePushOnOpen;
+                    
+                    ImGui::TreeNodeEx((void*)(intptr_t)i, flags, "[M] %s", mesh.name.c_str());
+                    
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::BeginTooltip();
+                        ImGui::Text("Vertices: %d", mesh.vertexCount);
+                        ImGui::Text("Faces: %d", mesh.faceCount);
+                        ImGui::Text("Has Normals: %s", mesh.hasNormals ? "Yes" : "No");
+                        ImGui::Text("Has UVs: %s", mesh.hasTexCoords ? "Yes" : "No");
+                        ImGui::TextDisabled("%s", mesh.path.c_str());
+                        ImGui::EndTooltip();
+                    }
+                    
+                    // Right-click to add instance to scene
+                    if (ImGui::BeginPopupContextItem()) {
+                        if (ImGui::MenuItem("Add to Scene")) {
+                            int id = nextObjectId++;
+                            SceneObject obj(mesh.name, ObjectType::OBJMesh, id);
+                            obj.meshPath = mesh.path;
+                            obj.meshId = static_cast<int>(i);
+                            sceneObjects.push_back(obj);
+                            selectedObjectId = id;
+                            projectManager.currentProject.hasUnsavedChanges = true;
+                            addConsoleMessage("Added mesh instance: " + mesh.name, ConsoleMessageType::Info);
+                        }
+                        ImGui::EndPopup();
+                    }
+                }
             }
         }
 
@@ -2035,6 +2324,11 @@ private:
                     if (ImGui::MenuItem("Cube")) addObject(ObjectType::Cube, "Cube");
                     if (ImGui::MenuItem("Sphere")) addObject(ObjectType::Sphere, "Sphere");
                     if (ImGui::MenuItem("Capsule")) addObject(ObjectType::Capsule, "Capsule");
+                    ImGui::Separator();
+                    // Import OBJ from menu
+                    if (ImGui::MenuItem("Import OBJ...")) {
+                        addConsoleMessage("Use File Browser to import .obj files (double-click or right-click)", ConsoleMessageType::Info);
+                    }
                     ImGui::EndMenu();
                 }
                 ImGui::EndMenu();
@@ -2128,6 +2422,7 @@ private:
             case ObjectType::Cube: icon = "[#]"; break;
             case ObjectType::Sphere: icon = "(O)"; break;
             case ObjectType::Capsule: icon = "[|]"; break;
+            case ObjectType::OBJMesh: icon = "[M]"; break;  // OBJ mesh icon
         }
 
         bool nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)obj.id, flags, "%s %s", icon, obj.name.c_str());
@@ -2208,11 +2503,21 @@ private:
             std::string filename = entry.path().filename().string();
 
             bool isSelected = (fileBrowser.selectedFile == entry.path());
+            bool isOBJ = fileBrowser.isOBJFile(entry);
 
             ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_NoTreePushOnOpen;
             if (isSelected) flags |= ImGuiTreeNodeFlags_Selected;
 
+            // Highlight OBJ files
+            if (isOBJ) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.8f, 0.4f, 1.0f));
+            }
+
             ImGui::TreeNodeEx(filename.c_str(), flags, "%s %s", icon, filename.c_str());
+            
+            if (isOBJ) {
+                ImGui::PopStyleColor();
+            }
 
             if (ImGui::IsItemClicked()) {
                 fileBrowser.selectedFile = entry.path();
@@ -2221,6 +2526,12 @@ private:
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
                 if (entry.is_directory()) {
                     fileBrowser.navigateTo(entry.path());
+                } else if (isOBJ) {
+                    // Double-click OBJ to import
+                    pendingOBJPath = entry.path().string();
+                    std::string defaultName = entry.path().stem().string();
+                    strncpy(importOBJName, defaultName.c_str(), sizeof(importOBJName) - 1);
+                    showImportOBJDialog = true;
                 } else {
                     logToConsole("Selected file: " + filename);
                 }
@@ -2230,6 +2541,18 @@ private:
                 if (ImGui::MenuItem("Open")) {
                     if (entry.is_directory()) {
                         fileBrowser.navigateTo(entry.path());
+                    }
+                }
+                // Add Import option for OBJ files
+                if (isOBJ) {
+                    if (ImGui::MenuItem("Import to Scene")) {
+                        pendingOBJPath = entry.path().string();
+                        std::string defaultName = entry.path().stem().string();
+                        strncpy(importOBJName, defaultName.c_str(), sizeof(importOBJName) - 1);
+                        showImportOBJDialog = true;
+                    }
+                    if (ImGui::MenuItem("Quick Import")) {
+                        importOBJToScene(entry.path().string(), "");
                     }
                 }
                 if (ImGui::MenuItem("Show in Explorer")) {
@@ -2283,7 +2606,7 @@ private:
 
             ImGui::Text("Type:");
             ImGui::SameLine();
-            const char* typeNames[] = { "Cube", "Sphere", "Capsule" };
+            const char* typeNames[] = { "Cube", "Sphere", "Capsule", "OBJ Mesh" };
             ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "%s", typeNames[(int)obj.type]);
 
             ImGui::Text("ID:");
@@ -2338,6 +2661,60 @@ private:
         }
 
         ImGui::PopStyleColor();
+
+        // OBJ Mesh info section
+        if (obj.type == ObjectType::OBJMesh) {
+            ImGui::Spacing();
+            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.3f, 0.5f, 0.4f, 1.0f));
+            
+            if (ImGui::CollapsingHeader("Mesh Info", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::Indent(10.0f);
+                
+                const auto* meshInfo = g_objLoader.getMeshInfo(obj.meshId);
+                if (meshInfo) {
+                    ImGui::Text("Source File:");
+                    ImGui::TextDisabled("%s", fs::path(meshInfo->path).filename().string().c_str());
+                    
+                    ImGui::Spacing();
+                    
+                    ImGui::Text("Vertices: %d", meshInfo->vertexCount);
+                    ImGui::Text("Faces: %d", meshInfo->faceCount);
+                    ImGui::Text("Has Normals: %s", meshInfo->hasNormals ? "Yes" : "No");
+                    ImGui::Text("Has UVs: %s", meshInfo->hasTexCoords ? "Yes" : "No");
+                    
+                    ImGui::Spacing();
+                    
+                    if (ImGui::Button("Reload Mesh", ImVec2(-1, 0))) {
+                        std::string errMsg;
+                        // Force reload by clearing and reloading
+                        int newId = g_objLoader.loadOBJ(obj.meshPath, errMsg);
+                        if (newId >= 0) {
+                            obj.meshId = newId;
+                            addConsoleMessage("Reloaded mesh: " + obj.name, ConsoleMessageType::Success);
+                        } else {
+                            addConsoleMessage("Failed to reload: " + errMsg, ConsoleMessageType::Error);
+                        }
+                    }
+                } else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Mesh data not found!");
+                    ImGui::TextDisabled("Path: %s", obj.meshPath.c_str());
+                    
+                    if (ImGui::Button("Try Reload", ImVec2(-1, 0))) {
+                        std::string errMsg;
+                        obj.meshId = g_objLoader.loadOBJ(obj.meshPath, errMsg);
+                        if (obj.meshId >= 0) {
+                            addConsoleMessage("Mesh reloaded successfully", ConsoleMessageType::Success);
+                        } else {
+                            addConsoleMessage("Reload failed: " + errMsg, ConsoleMessageType::Error);
+                        }
+                    }
+                }
+                
+                ImGui::Unindent(10.0f);
+            }
+            
+            ImGui::PopStyleColor();
+        }
 
         ImGui::Spacing();
 
@@ -2495,6 +2872,10 @@ private:
             newObj.position = it->position + glm::vec3(1.0f, 0.0f, 0.0f);
             newObj.rotation = it->rotation;
             newObj.scale = it->scale;
+            // Copy mesh data for OBJ meshes
+            newObj.meshPath = it->meshPath;
+            newObj.meshId = it->meshId;
+            
             sceneObjects.push_back(newObj);
             selectedObjectId = id;
             if (projectManager.currentProject.isLoaded) {
@@ -2557,7 +2938,6 @@ private:
 
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-        // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
         applyModernTheme();
 

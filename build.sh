@@ -4,6 +4,7 @@ if [ -d "build" ]; then
     echo ================================
     echo   Modularity - VS 2026 Build
     echo ================================
+    git submodule update --init --recursive
     echo "found existing!! Removing..."
     rm -rf build/
     mkdir build
