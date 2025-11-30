@@ -1,6 +1,9 @@
 #!/bin/bash
 
 if [ -d "build" ]; then
+    echo ================================
+    echo   Modularity - VS 2026 Build
+    echo ================================
     echo "found existing!! Removing..."
     rm -rf build/
     mkdir build
